@@ -119,6 +119,33 @@ activity_text.pack()
 activity_text.insert(tk.END, "• You added: $440 - Rent \n")
 activity_text.insert(tk.END, "• Rhiya paid: $20 - Toilet Paper\n")
 activity_text.insert(tk.END, "• You owe: $15 to Ayush for Dinner\n")
+# Expense Split Section
+split_section = tk.LabelFrame(dashboard_frame, text="Choose Split Method", padx=10, pady=10)
+split_section.pack(pady=15)
+
+split_type = tk.StringVar(value="Equal")
+
+tk.Label(split_section, text="Split Type:").pack()
+
+dropdown = tk.OptionMenu(split_section, split_type, "Equal", "Custom")
+dropdown.pack()
+
+# Frame for custom input fields (initially hidden)
+custom_frame = tk.Frame(split_section)
+
+def on_split_change(*args):
+    if split_type.get() == "Custom":
+        custom_frame.pack(pady=5)
+    else:
+        custom_frame.forget()
+
+split_type.trace("w", on_split_change)
+
+tk.Label(custom_frame, text="User 1 Amount ($):").pack()
+tk.Entry(custom_frame).pack()
+
+tk.Label(custom_frame, text="User 2 Amount ($):").pack()
+tk.Entry(custom_frame).pack()
 
 #Logout Button
 tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame),bg="#f4cccc").pack(pady=10)
