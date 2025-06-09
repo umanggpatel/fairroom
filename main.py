@@ -114,6 +114,8 @@ tk.Label(login_frame, text="Password").pack()
 entry_pass_login = tk.Entry(login_frame, show="*", width=30)
 entry_pass_login.pack()
 
+tk.Button(login_frame, text="Login", command=login_user).pack(pady=10)
+
 text = tk.Label(login_frame, text="Don't have an account?")
 
 register_link = tk.Label(login_frame, text=" Register Here", fg="green", cursor="hand2", font=('Arial', 10, 'underline'))
