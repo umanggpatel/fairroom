@@ -3,15 +3,13 @@ from tkinter import messagebox
 import sqlite3
 import os
 
-# === Reset DB on each run for clean testing (optional, remove for production) ===
-if os.path.exists("users.db"):
-    os.remove("users.db")
+
 
 # === Setup SQLite DB ===
 conn = sqlite3.connect("users.db")
 cursor = conn.cursor()
 cursor.execute("""
-    CREATE TABLE users (
+    CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         first_name TEXT NOT NULL,
         last_name TEXT NOT NULL,
@@ -60,8 +58,12 @@ def login_user():
     user = cursor.fetchone()
 
     if user:
-        messagebox.showinfo("Welcome", f"Welcome, {user[1]} {user[2]}!")
+        full_name = f"{user[1]} {user[2]}"
+        dashboard_name_label.config(text=f"Name: {full_name}")
+        dashboard_email_label.config(text=f"Email: {user[3]}")
+        messagebox.showinfo("Welcome", f"Welcome, {full_name}!")
         clear_fields()
+        show_frame(dashboard_frame)
     else:
         messagebox.showerror("Login Failed", "Invalid email or password.")
 
@@ -78,7 +80,20 @@ def clear_fields():
 register_frame = tk.Frame(root)
 login_frame = tk.Frame(root)
 
-for frame in (register_frame, login_frame):
+dashboard_frame = tk.Frame(root)
+
+# Profile labels to update after login
+dashboard_name_label = tk.Label(dashboard_frame, text="", font=("Arial", 14))
+dashboard_email_label = tk.Label(dashboard_frame, text="", font=("Arial", 12))
+
+tk.Label(dashboard_frame, text="Welcome to Your Dashboard", font=("Arial", 18)).pack(pady=10)
+dashboard_name_label.pack(pady=5)
+dashboard_email_label.pack(pady=5)
+
+tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame)).pack(pady=20)
+
+
+for frame in (register_frame, login_frame, dashboard_frame):
     frame.grid(row=0, column=0, sticky='nsew')
 
 # === Register Frame UI ===
