@@ -23,6 +23,7 @@ conn.commit()
 root = tk.Tk()
 root.title("Login & Register App")
 root.geometry("400x400")
+root.configure(bg="#f0f0f0")
 
 # === Frame Switching ===
 def show_frame(frame):
@@ -76,10 +77,9 @@ def clear_fields():
     entry_pass_login.delete(0, tk.END)
 
 # Frames
-register_frame = tk.Frame(root)
-login_frame = tk.Frame(root)
-
-dashboard_frame = tk.Frame(root)
+register_frame = tk.Frame(root,bg="#f0f0f0")
+login_frame = tk.Frame(root,bg="#f0f0f0")
+dashboard_frame = tk.Frame(root,bg="#f0f0f0")
 
 
 # personalized greeting
@@ -106,10 +106,10 @@ label_last_activity.pack(anchor='w')
 btn_frame = tk.Frame(dashboard_frame)
 btn_frame.pack(pady=10)
 
-tk.Button(btn_frame, text="Add New Expense", width=18).grid(row=0, column=0, padx=5, pady=5)
-tk.Button(btn_frame, text="View My Groups", width=18).grid(row=0, column=1, padx=5, pady=5)
-tk.Button(btn_frame, text="Monthly Summary", width=18).grid(row=1, column=0, padx=5, pady=5)
-tk.Button(btn_frame, text="Settings", width=18).grid(row=1, column=1, padx=5, pady=5)
+tk.Button(btn_frame, text="Add New Expense", width=18,bg="#cfe2f3").grid(row=0, column=0, padx=5, pady=5)
+tk.Button(btn_frame, text="View My Groups", width=18,bg="#cfe2f3").grid(row=0, column=1, padx=5, pady=5)
+tk.Button(btn_frame, text="Monthly Summary", width=18,bg="#cfe2f3").grid(row=1, column=0, padx=5, pady=5)
+tk.Button(btn_frame, text="Settings", width=18,bg="#cfe2f3").grid(row=1, column=1, padx=5, pady=5)
 
 # Recent Activity Feed
 tk.Label(dashboard_frame, text="Recent Activity", font=("Arial", 14)).pack(pady=10)
@@ -121,7 +121,7 @@ activity_text.insert(tk.END, "• Rhiya paid: $20 - Toilet Paper\n")
 activity_text.insert(tk.END, "• You owe: $15 to Ayush for Dinner\n")
 
 #Logout Button
-tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame)).pack(pady=10)
+tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame),bg="#f4cccc").pack(pady=10)
 
 
 
@@ -147,7 +147,7 @@ tk.Label(register_frame, text="Password").pack()
 entry_pass_reg = tk.Entry(register_frame, show="*", width=30)
 entry_pass_reg.pack()
 
-tk.Button(register_frame, text="Register", command=register_user).pack(pady=10)
+tk.Button(register_frame, text="Register", command=register_user,bg="#d9ead3").pack(pady=10)
 tk.Button(register_frame, text="Already registered? Login", command=lambda: show_frame(login_frame)).pack()
 
 #  Login Frame UI
@@ -157,11 +157,11 @@ tk.Label(login_frame, text="Email").pack()
 entry_email_login = tk.Entry(login_frame, width=30)
 entry_email_login.pack()
 
-tk.Label(login_frame, text="Password").pack()
+tk.Label(login_frame, text="Password",bg="#f0f0f0").pack()
 entry_pass_login = tk.Entry(login_frame, show="*", width=30)
 entry_pass_login.pack()
 
-tk.Button(login_frame, text="Login", command=login_user).pack(pady=10)
+tk.Button(login_frame, text="Login", command=login_user,bg="#d9ead3").pack(pady=10)
 
 text = tk.Label(login_frame, text="Don't have an account?")
 
