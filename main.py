@@ -59,15 +59,14 @@ def login_user():
 
     if user:
         full_name = f"{user[1]} {user[2]}"
-        dashboard_name_label.config(text=f"Name: {full_name}")
-        dashboard_email_label.config(text=f"Email: {user[3]}")
+        dashboard_greeting.config(text=f"Welcome, {full_name} 👋")
         messagebox.showinfo("Welcome", f"Welcome, {full_name}!")
         clear_fields()
         show_frame(dashboard_frame)
     else:
         messagebox.showerror("Login Failed", "Invalid email or password.")
 
-# === Clear All Inputs ===
+#  Clear All Inputs
 def clear_fields():
     entry_fname.delete(0, tk.END)
     entry_lname.delete(0, tk.END)
@@ -76,27 +75,60 @@ def clear_fields():
     entry_email_login.delete(0, tk.END)
     entry_pass_login.delete(0, tk.END)
 
-# === Frames ===
+# Frames
 register_frame = tk.Frame(root)
 login_frame = tk.Frame(root)
 
 dashboard_frame = tk.Frame(root)
 
-# Profile labels to update after login
-dashboard_name_label = tk.Label(dashboard_frame, text="", font=("Arial", 14))
-dashboard_email_label = tk.Label(dashboard_frame, text="", font=("Arial", 12))
 
-tk.Label(dashboard_frame, text="Welcome to Your Dashboard", font=("Arial", 18)).pack(pady=10)
-dashboard_name_label.pack(pady=5)
-dashboard_email_label.pack(pady=5)
+# personalized greeting
+dashboard_greeting = tk.Label(dashboard_frame, text="", font=("Arial", 14))
+dashboard_greeting.pack(pady=5)
 
-tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame)).pack(pady=20)
+# Summary Panel
+summary_frame = tk.Frame(dashboard_frame)
+summary_frame.pack(pady=10)
+
+label_total_paid = tk.Label(summary_frame, text="Total expenses paid: $0")
+label_total_paid.pack(anchor='w')
+
+label_total_owed_to_you = tk.Label(summary_frame, text="Total owed by others: $0")
+label_total_owed_to_you.pack(anchor='w')
+
+label_you_owe = tk.Label(summary_frame, text="You owe: $0")
+label_you_owe.pack(anchor='w')
+
+label_last_activity = tk.Label(summary_frame, text="Last activity: None")
+label_last_activity.pack(anchor='w')
+
+# Dashboard Action Buttons
+btn_frame = tk.Frame(dashboard_frame)
+btn_frame.pack(pady=10)
+
+tk.Button(btn_frame, text="Add New Expense", width=18).grid(row=0, column=0, padx=5, pady=5)
+tk.Button(btn_frame, text="View My Groups", width=18).grid(row=0, column=1, padx=5, pady=5)
+tk.Button(btn_frame, text="Monthly Summary", width=18).grid(row=1, column=0, padx=5, pady=5)
+tk.Button(btn_frame, text="Settings", width=18).grid(row=1, column=1, padx=5, pady=5)
+
+# Recent Activity Feed
+tk.Label(dashboard_frame, text="Recent Activity", font=("Arial", 14)).pack(pady=10)
+
+activity_text = tk.Text(dashboard_frame, height=5, width=45)
+activity_text.pack()
+activity_text.insert(tk.END, "• You added: $440 - Rent \n")
+activity_text.insert(tk.END, "• Rhiya paid: $20 - Toilet Paper\n")
+activity_text.insert(tk.END, "• You owe: $15 to Ayush for Dinner\n")
+
+#Logout Button
+tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame)).pack(pady=10)
+
 
 
 for frame in (register_frame, login_frame, dashboard_frame):
     frame.grid(row=0, column=0, sticky='nsew')
 
-# === Register Frame UI ===
+# Register Frame UI
 tk.Label(register_frame, text="Register", font=("Arial", 18)).pack(pady=10)
 
 tk.Label(register_frame, text="First Name").pack()
@@ -118,7 +150,7 @@ entry_pass_reg.pack()
 tk.Button(register_frame, text="Register", command=register_user).pack(pady=10)
 tk.Button(register_frame, text="Already registered? Login", command=lambda: show_frame(login_frame)).pack()
 
-# === Login Frame UI ===
+#  Login Frame UI
 tk.Label(login_frame, text="Login", font=("Arial", 18)).pack(pady=10)
 
 tk.Label(login_frame, text="Email").pack()
