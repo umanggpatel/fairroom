@@ -6,7 +6,7 @@ manager = ExpenseManager()
 user_id = None
 group_id = None
 
-def launch_app():
+def launch_app(): 
     def attempt_login():
         global user_id
         username = login_user.get()
