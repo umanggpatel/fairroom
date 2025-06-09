@@ -2,7 +2,7 @@ import sqlite3
 import csv
 
 class ExpenseManager:
-    def __init__(self):
+    def __init__(self): 
         self.conn = sqlite3.connect("db/roommates.db")
         self.c = self.conn.cursor()
         self.create_tables()
