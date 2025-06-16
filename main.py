@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import messagebox
 import sqlite3
 import os
+from tkinter import ttk
+
 
 
 
@@ -20,10 +22,41 @@ cursor.execute("""
 conn.commit()
 
 # === Main Window ===
+#root = tk.Tk()
+#root.title("Login & Register App")
+#root.geometry("400x400")
+#root.configure(bg="#f0f0f0")
+
 root = tk.Tk()
 root.title("Login & Register App")
 root.geometry("400x400")
 root.configure(bg="#f0f0f0")
+
+style = ttk.Style()
+style.theme_use("clam")  # Use clam theme for full color control
+
+
+
+# Define a custom button style
+style.configure("Custom.TButton",
+    background="#4caf50",
+    foreground="white",
+    font=("Arial", 11, "bold"),
+    padding=10
+)
+style.map("Custom.TButton",
+    background=[("active", "#45a049")],
+    foreground=[("active", "white")]
+)
+root.grid_rowconfigure(0, weight=1)
+root.grid_columnconfigure(0, weight=1)
+
+
+# Style Configuration 
+style = ttk.Style()
+style.theme_use("clam")  # Use a flat modern theme
+style.configure("RoundedEntry.TEntry", relief="flat", padding=6, borderwidth=1, font=("Arial", 12))
+
 
 # === Frame Switching ===
 def show_frame(frame):
@@ -66,7 +99,7 @@ def login_user():
         show_frame(dashboard_frame)
     else:
         messagebox.showerror("Login Failed", "Invalid email or password.")
-
+        
 #  Clear All Inputs
 def clear_fields():
     entry_fname.delete(0, tk.END)
@@ -77,9 +110,9 @@ def clear_fields():
     entry_pass_login.delete(0, tk.END)
 
 # Frames
-register_frame = tk.Frame(root,bg="#f0f0f0")
-login_frame = tk.Frame(root,bg="#f0f0f0")
-dashboard_frame = tk.Frame(root,bg="#f0f0f0")
+register_frame = tk.Frame(root,bg="#519b71")
+login_frame = tk.Frame(root,bg="#49A475")
+dashboard_frame = tk.Frame(root,bg="#547a33")
 
 
 # personalized greeting
@@ -103,13 +136,32 @@ label_last_activity = tk.Label(summary_frame, text="Last activity: None")
 label_last_activity.pack(anchor='w')
 
 # Dashboard Action Buttons
-btn_frame = tk.Frame(dashboard_frame)
-btn_frame.pack(pady=10)
+#btn_frame = tk.Frame(dashboard_frame)
+#btn_frame.pack(pady=10)
 
-tk.Button(btn_frame, text="Add New Expense", width=18,bg="#cfe2f3").grid(row=0, column=0, padx=5, pady=5)
-tk.Button(btn_frame, text="View My Groups", width=18,bg="#cfe2f3").grid(row=0, column=1, padx=5, pady=5)
-tk.Button(btn_frame, text="Monthly Summary", width=18,bg="#cfe2f3").grid(row=1, column=0, padx=5, pady=5)
-tk.Button(btn_frame, text="Settings", width=18,bg="#cfe2f3").grid(row=1, column=1, padx=5, pady=5)
+#tk.Button(btn_frame, text="Add New Expense", width=18,bg="#2287e0").grid(row=0, column=0, padx=5, pady=5)
+#tk.Button(btn_frame, text="View My Groups", width=18,bg="#67a1d3").grid(row=0, column=1, padx=5, pady=5)
+#tk.Button(btn_frame, text="Monthly Summary", width=18,bg="#cfe2f3").grid(row=1, column=0, padx=5, pady=5)
+#tk.Button(btn_frame, text="Settings", width=18,bg="#cfe2f3").grid(row=1, column=1, padx=5, pady=5)
+
+btn_frame = ttk.Frame(dashboard_frame)
+btn_frame.pack(pady=20)
+
+button_labels = [
+    "➕ Add Expense",
+    "👥 View Groups",
+    "📊 Monthly Summary",
+    "⚙️ Settings"
+]
+
+for idx, text in enumerate(button_labels):
+    ttk.Button(
+        btn_frame,
+        text=text,
+        style="Custom.TButton",
+        width=22
+    ).grid(row=idx // 2, column=idx % 2, padx=12, pady=12)
+
 
 # Recent Activity Feed
 tk.Label(dashboard_frame, text="Recent Activity", font=("Arial", 14)).pack(pady=10)
@@ -148,7 +200,7 @@ tk.Label(custom_frame, text="User 2 Amount ($):").pack()
 tk.Entry(custom_frame).pack()
 
 #Logout Button
-tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame),bg="#f4cccc").pack(pady=10)
+tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame),bg="#4f7faa").pack(pady=10)
 
 
 
@@ -178,26 +230,29 @@ tk.Button(register_frame, text="Register", command=register_user,bg="#d9ead3").p
 tk.Button(register_frame, text="Already registered? Login", command=lambda: show_frame(login_frame)).pack()
 
 #  Login Frame UI
-tk.Label(login_frame, text="Login", font=("Arial", 18)).pack(pady=10)
+#  Login Frame UI (cleaned and styled)
+tk.Label(login_frame, text="Login", font=("Arial", 20, "bold"), bg="#49A475", fg="white").pack(pady=(30, 15))
 
-tk.Label(login_frame, text="Email").pack()
-entry_email_login = tk.Entry(login_frame, width=30)
-entry_email_login.pack()
+tk.Label(login_frame, text="Email", bg="#49A475", fg="white", font=("Arial", 12)).pack(pady=(5, 2))
+entry_email_login = ttk.Entry(login_frame, width=30, style="RoundedEntry.TEntry")
+entry_email_login.pack(pady=5)
+#entry_email_login = tk.Entry(login_frame, width=30, font=("Arial", 12), bg="white", fg="black", relief=tk.FLAT)
+#entry_email_login.pack(pady=(0, 10))
 
-tk.Label(login_frame, text="Password",bg="#f0f0f0").pack()
-entry_pass_login = tk.Entry(login_frame, show="*", width=30)
-entry_pass_login.pack()
+tk.Label(login_frame, text="Password", bg="#49A475", fg="white", font=("Arial", 12)).pack(pady=(5, 2))
+entry_pass_login = ttk.Entry(login_frame, width=30, style="RoundedEntry.TEntry", show="*")
+entry_pass_login.pack(pady=5)
+#entry_pass_login = tk.Entry(login_frame, show="*", width=30, font=("Arial", 12), bg="white", fg="black", relief=tk.FLAT)
+#entry_pass_login.pack(pady=(0, 15))
 
-tk.Button(login_frame, text="Login", command=login_user,bg="#d9ead3").pack(pady=10)
+tk.Button(login_frame, text="Login", command=login_user, bg="white", fg="#081abd", font=("Arial", 12, "bold"), relief=tk.GROOVE, width=15).pack(pady=10)
 
-text = tk.Label(login_frame, text="Don't have an account?")
-
-register_link = tk.Label(login_frame, text=" Register Here", fg="green", cursor="hand2", font=('Arial', 10, 'underline'))
-text.pack()
+# Account navigation
+tk.Label(login_frame, text="Don't have an account?", bg="#49A475", fg="white", font=("Arial", 10)).pack(pady=(20, 5))
+register_link = tk.Label(login_frame, text="Register Here", fg="yellow", bg="#49A475", cursor="hand2", font=('Arial', 10, 'underline'))
 register_link.pack()
-
-
 register_link.bind("<Button-1>", lambda e: show_frame(register_frame))
+
 
 # Start on register page for first use
 #show_frame(register_frame)
