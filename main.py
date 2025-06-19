@@ -151,7 +151,9 @@ button_labels = [
     "➕ Add Expense",
     "👥 View Groups",
     "📊 Monthly Summary",
-    "⚙️ Settings"
+    "⚙️ Settings",
+    "View Balances",
+    "Logout"
 ]
 
 for idx, text in enumerate(button_labels):
