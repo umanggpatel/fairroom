@@ -10,7 +10,7 @@ A simple desktop application built with Python and Tkinter to help roommates reg
 - Export expenses to CSV
 - Tkinter GUI interface
 
-#Requirements
+#Requirements: 
   Python 3.x
   Tkinter (comes built-in)
 
