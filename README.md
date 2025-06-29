@@ -1,2 +1,20 @@
-# fairroom
-Application designed to help roommates track shared expenses. It allow users to create groups, add expenses, spilt costs equally or by  custom amounts and view balance summaries. 
+# FairRoom – Roommate Expense Splitter 
+
+A simple desktop application built with Python and Tkinter to help roommates register, log in, join groups, add expenses, split bills, and export data.
+
+# Features
+- User registration and login
+- Group-based expense management
+- Equal or custom bill splits
+- SQLite-based persistent storage
+- Export expenses to CSV
+- Tkinter GUI interface
+
+#Requirements
+  Python 3.x
+  Tkinter (comes built-in)
+
+# How to Run
+```bash
+python main.py
+
