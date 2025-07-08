@@ -5,8 +5,6 @@ import os
 from tkinter import ttk
 
 
-
-
 # === Setup SQLite DB ===
 conn = sqlite3.connect("users.db")
 cursor = conn.cursor()
@@ -19,21 +17,27 @@ cursor.execute("""
         password TEXT NOT NULL
     )
 """)
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS balances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        other_party TEXT NOT NULL,
+        amount REAL NOT NULL,
+        type TEXT CHECK(type IN ('owes_you', 'you_owe')) NOT NULL
+    )
+""")
 conn.commit()
 
 # === Main Window ===
-#root = tk.Tk()
-#root.title("Login & Register App")
-#root.geometry("400x400")
-#root.configure(bg="#f0f0f0")
+
 
 root = tk.Tk()
-root.title("Login & Register App")
-root.geometry("400x400")
+root.title("Login & Register")
+root.geometry("400x500")
 root.configure(bg="#f0f0f0")
 
 style = ttk.Style()
-style.theme_use("clam")  # Use clam theme for full color control
+style.theme_use("clam")  
 
 
 
@@ -48,14 +52,16 @@ style.map("Custom.TButton",
     background=[("active", "#45a049")],
     foreground=[("active", "white")]
 )
+
+style.configure("RoundedEntry.TEntry", relief="flat", padding=6, borderwidth=1, font=("Arial", 12))
 root.grid_rowconfigure(0, weight=1)
 root.grid_columnconfigure(0, weight=1)
 
 
 # Style Configuration 
-style = ttk.Style()
-style.theme_use("clam")  # Use a flat modern theme
-style.configure("RoundedEntry.TEntry", relief="flat", padding=6, borderwidth=1, font=("Arial", 12))
+#style = ttk.Style()
+#style.theme_use("clam")  # Use a flat modern theme
+#style.configure("RoundedEntry.TEntry", relief="flat", padding=6, borderwidth=1, font=("Arial", 12))
 
 
 # === Frame Switching ===
@@ -85,6 +91,7 @@ def register_user():
 
 # === Login User ===
 def login_user():
+    global logged_in_email
     email = entry_email_login.get().strip().lower()
     password = entry_pass_login.get().strip()
 
@@ -94,6 +101,7 @@ def login_user():
     if user:
         full_name = f"{user[1]} {user[2]}"
         dashboard_greeting.config(text=f"Welcome, {full_name} 👋")
+        logged_in_email=email
         messagebox.showinfo("Welcome", f"Welcome, {full_name}!")
         clear_fields()
         show_frame(dashboard_frame)
@@ -109,11 +117,28 @@ def clear_fields():
     entry_email_login.delete(0, tk.END)
     entry_pass_login.delete(0, tk.END)
 
+#View Balance
+def update_balances_view():
+    balances_list.delete(1.0, tk.END)
+    cursor.execute("SELECT other_party, amount, type FROM balances WHERE user_email=?", (logged_in_email,))
+    rows = cursor.fetchall()
+
+    if not rows:
+        balances_list.insert(tk.END, "No balances found.\n")
+    else:
+        for party, amt, typ in rows:
+            if typ == "you_owe":
+                balances_list.insert(tk.END, f"You owe {party}: ${amt:.2f}\n")
+            else:
+                balances_list.insert(tk.END, f"{party} owes you: ${amt:.2f}\n")
+
+    show_frame(view_balances_frame)
+
 # Frames
 register_frame = tk.Frame(root,bg="#519b71")
 login_frame = tk.Frame(root,bg="#49A475")
 dashboard_frame = tk.Frame(root,bg="#547a33")
-
+view_balances_frame = tk.Frame(root, bg="#f0f0f0")
 
 # personalized greeting
 dashboard_greeting = tk.Label(dashboard_frame, text="", font=("Arial", 14))
@@ -148,18 +173,19 @@ btn_frame = ttk.Frame(dashboard_frame)
 btn_frame.pack(pady=20)
 
 button_labels = [
-    "➕ Add Expense",
-    "👥 View Groups",
-    "📊 Monthly Summary",
-    "⚙️ Settings",
-    "View Balances",
-    "Logout"
+    ("➕ Add Expense", lambda: None),
+    ("👥 View Groups", lambda: None),
+    ("📊 Monthly Summary", lambda: None),
+    ("⚙️ Settings", lambda: None),
+    ("View Balances", update_balances_view),
+    ("Logout", lambda: show_frame(login_frame))
 ]
 
-for idx, text in enumerate(button_labels):
+for idx, (text,command) in enumerate(button_labels):
     ttk.Button(
         btn_frame,
         text=text,
+        command=command,
         style="Custom.TButton",
         width=22
     ).grid(row=idx // 2, column=idx % 2, padx=12, pady=12)
@@ -206,8 +232,14 @@ tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_fram
 
 
 
-for frame in (register_frame, login_frame, dashboard_frame):
-    frame.grid(row=0, column=0, sticky='nsew')
+#for frame in (register_frame, login_frame, dashboard_frame):
+    #frame.grid(row=0, column=0, sticky='nsew')
+
+    #View Balance frame
+tk.Label(view_balances_frame, text="Your Balances", font=("Arial", 16)).pack(pady=10)
+balances_list = tk.Text(view_balances_frame, height=10, width=45)
+balances_list.pack(pady=10)
+tk.Button(view_balances_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=10)
 
 # Register Frame UI
 tk.Label(register_frame, text="Register", font=("Arial", 18)).pack(pady=10)
@@ -255,6 +287,10 @@ register_link = tk.Label(login_frame, text="Register Here", fg="yellow", bg="#49
 register_link.pack()
 register_link.bind("<Button-1>", lambda e: show_frame(register_frame))
 
+for frame in (register_frame, login_frame, dashboard_frame, view_balances_frame):
+    frame.grid(row=0, column=0, sticky='nsew')
+
+logged_in_email = None
 
 # Start on register page for first use
 #show_frame(register_frame)
