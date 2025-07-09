@@ -1,8 +1,12 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk, filedialog, simpledialog
 import sqlite3
 import os
-from tkinter import ttk
+from datetime import datetime, timedelta
+import hashlib
+import random
+import string
+import csv
 
 
 # === Setup SQLite DB ===
