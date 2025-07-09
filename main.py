@@ -10,8 +10,12 @@ import csv
 
 
 # === Setup SQLite DB ===
+if os.path.exists("users.db"):
+    os.remove("users.db")
+
 conn = sqlite3.connect("users.db")
 cursor = conn.cursor()
+
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
