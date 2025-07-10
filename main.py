@@ -90,7 +90,8 @@ root.grid_columnconfigure(0, weight=1)
 logged_in_email = None
 
 # === Frames ===
-login_frame = tk.Frame(root, bg="#e0f7fa")
+login_frame = tk.Frame(root, bg="#87d188")
+register_frame = tk.Frame(root, bg="#ffccbc")
 dashboard_frame = tk.Frame(root, bg="#a5d6a7")
 expense_frame = tk.Frame(root, bg="#fff3e0")
 group_frame = tk.Frame(root, bg="#ede7f6")
@@ -99,7 +100,7 @@ settings_frame = tk.Frame(root, bg="#d7ccc8")
 history_frame = tk.Frame(root, bg="#ffe0b2")
 
 
-for frame in (login_frame, dashboard_frame, expense_frame, group_frame, settings_frame, history_frame):
+for frame in (login_frame,register_frame, dashboard_frame, expense_frame, group_frame, settings_frame, history_frame):
     frame.grid(row=0, column=0, sticky='nsew')
 
 def show_frame(frame):
@@ -539,8 +540,9 @@ history_text = tk.Text(history_frame, height=30, width=50)
 history_text.pack(pady=10)
 tk.Button(history_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
 
-
 # --- Login Frame ---
+tk.Label(login_frame, text="Login", font=("Arial", 18)).pack(pady=10)
+
 tk.Label(login_frame, text="Email").pack(pady=5)
 login_email = tk.Entry(login_frame)
 login_email.pack(pady=5)
@@ -554,20 +556,34 @@ remember_checkbox.pack()
 
 tk.Button(login_frame, text="Login", command=login_user).pack(pady=10)
 
-tk.Label(login_frame, text="--- OR Register ---").pack(pady=10)
-tk.Label(login_frame, text="First Name").pack()
-reg_fname = tk.Entry(login_frame)
+tk.Label(login_frame, text="Don't have an account?").pack()
+tk.Button(login_frame, text="Register Here", command=lambda: show_frame(register_frame)).pack()
+
+# --- Registration Frame ---
+tk.Label(register_frame, text="Register", font=("Arial", 18)).pack(pady=10)
+
+tk.Label(register_frame, text="First Name").pack()
+reg_fname = tk.Entry(register_frame)
 reg_fname.pack()
-tk.Label(login_frame, text="Last Name").pack()
-reg_lname = tk.Entry(login_frame)
+
+tk.Label(register_frame, text="Last Name").pack()
+reg_lname = tk.Entry(register_frame)
 reg_lname.pack()
-tk.Label(login_frame, text="Email").pack()
-reg_email = tk.Entry(login_frame)
+
+tk.Label(register_frame, text="Email").pack()
+reg_email = tk.Entry(register_frame)
 reg_email.pack()
-tk.Label(login_frame, text="Password").pack()
-reg_password = tk.Entry(login_frame, show="*")
+
+tk.Label(register_frame, text="Password").pack()
+reg_password = tk.Entry(register_frame, show="*")
 reg_password.pack()
-tk.Button(login_frame, text="Register", command=register_user).pack(pady=10)
+
+tk.Label(register_frame, text="Confirm Password").pack()
+reg_confirm = tk.Entry(register_frame, show="*")
+reg_confirm.pack()
+
+tk.Button(register_frame, text="Register", command=register_user).pack(pady=10)
+tk.Button(register_frame, text="Back to Login", command=lambda: show_frame(login_frame)).pack()
 
 # --- Dashboard Frame ---
 dashboard_greeting = tk.Label(dashboard_frame, text="Welcome!", font=("Arial", 16))
