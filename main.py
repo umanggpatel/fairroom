@@ -610,7 +610,7 @@ tk.Button(settings_frame, text="Deactivate Account", command=deactivate_account)
 tk.Button(settings_frame, text="Delete Account", command=delete_account).pack(pady=5)
 tk.Button(settings_frame, text="Back to Dashboard", command=lambda: [load_notification_setting(), show_frame(dashboard_frame)]).pack(pady=5)
 
-
+#Auto-Fill Login Email if Remember Me was Used
 saved_email = get_remember_email()
 if saved_email:
     login_email.insert(0, saved_email)
