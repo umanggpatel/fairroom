@@ -64,6 +64,16 @@ cursor.execute("""
         FOREIGN KEY(expense_id) REFERENCES expenses(id)
     )
 """)
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS balances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        other_party TEXT NOT NULL,
+        amount REAL NOT NULL,
+        type TEXT CHECK(type IN ('owes_you', 'you_owe')) NOT NULL
+    )
+""")
 conn.commit()
 
 
@@ -301,6 +311,9 @@ def view_groups():
         group_list.insert(tk.END, row[0])
     show_frame(group_frame)
 
+
+
+
 def open_settings():
     load_notification_setting()
     show_frame(settings_frame)
@@ -489,6 +502,43 @@ def add_expense():
     except ValueError:
         messagebox.showerror("Error", "Invalid amount")
 
+#View Balance
+def update_balances_view():
+    global view_balances_frame, balances_list
+
+    view_balances_frame = tk.Frame(root, bg="#f0f0f0")
+    tk.Label(view_balances_frame, text="Your Balances", font=("Arial", 16)).pack(pady=10)
+    balances_list = tk.Text(view_balances_frame, height=10, width=45)
+    balances_list.pack(pady=10)
+    tk.Button(view_balances_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=10)
+
+    cursor.execute("SELECT other_party, amount, type FROM balances WHERE user_email=?", (logged_in_email,))
+    rows = cursor.fetchall()
+
+    if not rows:
+        balances_list.insert(tk.END, "No balances found.\n")
+    else:
+        for party, amt, typ in rows:
+            if typ == "you_owe":
+                balances_list.insert(tk.END, f"You owe {party}: ${amt:.2f}\n")
+            else:
+                balances_list.insert(tk.END, f"{party} owes you: ${amt:.2f}\n")
+    view_balances_frame.grid(row=0, column=0, sticky='nsew')
+
+    show_frame(view_balances_frame)
+
+
+
+
+    # Format the balances in a string
+   # balances_text = ""
+    #for row in rows:
+        #full_name = f"{row[0]} {row[1]}"
+     #   balance = f"₹{row[2]:.2f}"
+        #balances_text += f"{full_name}: {balance}\n"
+
+   # messagebox.showinfo("User Balances", balances_text)
+
 # === Settings additions ===
 
 notif_var = tk.IntVar()
@@ -564,7 +614,7 @@ title_label.pack(pady=(0, 10))
 tk.Label(login_box, text="📧Email", font=("Arial", 14), bg="#fefae0", fg="black", anchor="w").pack(fill="x", pady=(10, 0))
 
 login_email = tk.Entry(login_box, fg='grey', bg="#f5f7f7", insertbackground='white')
-login_email.insert(0, "youremail@gmail.com")
+#login_email.insert(0, "youremail@gmail.com")
 login_email.pack(fill="x", pady=5, ipady=5, ipadx=5)
 
 def on_entry_click_email(event):
@@ -672,7 +722,16 @@ tk.Button(action_section, text="💾 Export Expenses (CSV)", font=("Arial", 11),
 tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11), command=view_monthly_summary).pack(fill="x", pady=2)
 tk.Button(action_section, text="⚙️ Settings", font=("Arial", 11), command=open_settings).pack(fill="x", pady=2)
 tk.Button(action_section, text="📜 View Expense History", font=("Arial", 11), command=show_expense_history).pack(fill="x", pady=2)
+tk.Button(action_section, text="📋 View Balances", font=("Arial", 11), command=update_balances_view).pack(fill="x", pady=2)
+
+
 tk.Button(dashboard_frame, text="\u21AA Logout", command=logout_user).pack(side="bottom", fill="x", pady=10)
+
+
+
+
+
+
 
 
 # --- Expense Frame ---
