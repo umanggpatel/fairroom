@@ -641,6 +641,8 @@ tk.Button(settings_frame, text="Logout", command=logout_user).pack(pady=5)
 tk.Button(settings_frame, text="Deactivate Account", command=deactivate_account).pack(pady=5)
 tk.Button(settings_frame, text="Delete Account", command=delete_account).pack(pady=5)
 tk.Button(settings_frame, text="Back to Dashboard", command=lambda: [load_notification_setting(), show_frame(dashboard_frame)]).pack(pady=5)
+tk.Button(dashboard_frame, text="View Expense History", command=show_expense_history).pack(pady=5)
+
 
 #Auto-Fill Login Email if Remember Me was Used
 saved_email = get_remember_email()
