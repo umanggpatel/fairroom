@@ -72,6 +72,7 @@ root.title("Expense & Group Manager")
 root.geometry("400x850")
 root.configure(bg="#eaf6f9")
 
+
 style = ttk.Style()
 style.theme_use("clam")
 style.configure("Custom.TButton",
@@ -543,23 +544,81 @@ history_text.pack(pady=10)
 tk.Button(history_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
 
 # --- Login Frame ---
-tk.Label(login_frame, text="Login", font=("Arial", 18)).pack(pady=10)
+#tk.Label(login_frame, text="Login", font=("Arial", 20)).pack(pady=10)
 
-tk.Label(login_frame, text="Email").pack(pady=5)
-login_email = tk.Entry(login_frame)
-login_email.pack(pady=5)
+# bordered box for neat layout
+login_box = tk.Frame(login_frame, bg="#fefae0", bd=2, relief="groove", padx=20, pady=20)
+login_box.pack(pady=40)
 
-tk.Label(login_frame, text="Password").pack(pady=5)
-login_password = tk.Entry(login_frame, show="*")
-login_password.pack(pady=5)
+emoji_label = tk.Label(login_box, text="👤", font=("Arial", 28), fg="#4caf50", bg="white")
+emoji_label.pack(pady=(25, 0))
 
-remember_checkbox = tk.Checkbutton(login_frame, text="Remember Me", variable=remember_var)
-remember_checkbox.pack()
+title_label = tk.Label(login_box, text="Login", font=("Arial", 28, "bold"), fg="#040303", bg="white")
+title_label.pack(pady=(0, 10))
 
-tk.Button(login_frame, text="Login", command=login_user).pack(pady=10)
+#tk.Label(login_frame, text="Email").pack(pady=5)
+#login_email = tk.Entry(login_frame)
+#login_email.pack(pady=5)
 
-tk.Label(login_frame, text="Don't have an account?").pack()
-tk.Button(login_frame, text="Register Here", command=lambda: show_frame(register_frame)).pack()
+#with email placeholder text
+tk.Label(login_box, text="📧Email", font=("Arial", 14), bg="#fefae0", fg="black", anchor="w").pack(fill="x", pady=(10, 0))
+
+login_email = tk.Entry(login_box, fg='grey', bg="#f5f7f7", insertbackground='white')
+login_email.insert(0, "youremail@gmail.com")
+login_email.pack(fill="x", pady=5, ipady=5, ipadx=5)
+
+def on_entry_click_email(event):
+    if login_email.get() == "youremail@gmail.com":
+        login_email.delete(0, tk.END)
+        login_email.config(fg='black')
+
+def on_focusout_email(event):
+    if login_email.get() == "":
+        login_email.insert(0, "youremail@gmail.com")
+        login_email.config(fg='grey')
+
+login_email.bind("<FocusIn>", on_entry_click_email)
+login_email.bind("<FocusOut>", on_focusout_email)
+
+#tk.Label(login_frame, text="Password").pack(pady=5)
+#login_password = tk.Entry(login_frame, show="*")
+#login_password.pack(pady=5)
+
+# password and placeholder text
+tk.Label(login_box, text="🔑Password", font=("Arial", 14), bg="#fefae0", fg="black", anchor="w").pack(fill="x", pady=(10, 0))
+
+login_password = tk.Entry(login_box, fg='grey', bg="#f5f7f7", insertbackground='white')
+login_password.insert(0, "Password")
+login_password.pack(fill="x", pady=5, ipady=5, ipadx=5)
+
+def on_entry_click_password(event):
+    if login_password.get() == "Password":
+        login_password.delete(0, tk.END)
+        login_password.config(show="*", fg='black')
+
+def on_focusout_password(event):
+    if login_password.get() == "":
+        login_password.insert(0, "Password")
+        login_password.config(show="", fg='grey')
+
+login_password.bind("<FocusIn>", on_entry_click_password)
+login_password.bind("<FocusOut>", on_focusout_password)
+
+remember_checkbox = tk.Checkbutton(login_box, text="📌 Remember Me",font=("Arial", 10), bd=1,highlightthickness=1,highlightbackground="black",selectcolor="white",
+activebackground="#fefae0", indicatoron=True, variable=remember_var, bg="#fefae0", fg="black") 
+#remember_checkbox.pack(pady=(10, 0))
+remember_checkbox.pack(anchor="w", padx=0, pady=(0, 10))
+
+#tk.Button(login_box, text="Login", command=login_user).pack(pady=10)
+tk.Button(login_box,text="Login",command=login_user,font=("Arial", 11, "bold"),bg="#2196f3",fg="black",             
+    activebackground="#1976d2",  
+    activeforeground="black",
+    relief="raised",
+    bd=2
+).pack(fill="x", pady=(10, 5))
+
+tk.Label(login_box, text="Don't have an account?", bg="#fefae0",fg="black").pack()
+tk.Button(login_box, text="🙋‍♂️ Register Here", command=lambda: show_frame(register_frame)).pack()
 
 # --- Registration Frame ---
 tk.Label(register_frame, text="Register", font=("Arial", 18)).pack(pady=10)
@@ -587,19 +646,34 @@ reg_confirm.pack()
 tk.Button(register_frame, text="Register", command=register_user).pack(pady=10)
 tk.Button(register_frame, text="Back to Login", command=lambda: show_frame(login_frame)).pack()
 
-# --- Dashboard Frame ---
-dashboard_greeting = tk.Label(dashboard_frame, text="Welcome!", font=("Arial", 16))
+# --- Dashboard Frame UI ---
+dashboard_greeting = tk.Label(dashboard_frame, text="👋 Welcome!", font=("Arial", 18, "bold"), fg="#00796b", bg="#6babc3")
 dashboard_greeting.pack(pady=10)
 
-activity_text = tk.Text(dashboard_frame, height=10, width=45)
+# Activity Feed
+activity_label = tk.Label(dashboard_frame, text="📜 Recent Activity", font=("Arial", 12, "bold"), bg="#6babc3", fg="black")
+activity_label.pack(anchor="w", padx=10)
+activity_text = tk.Text(dashboard_frame, height=8, width=45)
 activity_text.pack(pady=5)
 
-tk.Button(dashboard_frame, text="Manage Groups (Create/Add Members)", command=view_groups).pack(pady=5)
-tk.Button(dashboard_frame, text="➕ Add Expense", font=("Arial", 11, "bold"), command=lambda: [update_groups_in_expense_combo(), show_frame(expense_frame)]).pack(pady=5)
-tk.Button(dashboard_frame, text="💾 Export My Expenses (CSV)", command=export_expenses).pack(pady=5)
-tk.Button(dashboard_frame, text=" 📊 View Monthly Expense Summary", command=view_monthly_summary).pack(pady=5)
-tk.Button(dashboard_frame, text="⚙️ Settings", command=open_settings).pack(pady=5)
-tk.Button(dashboard_frame, text="\u21AA Logout", command=logout_user).pack(pady=5)
+# Seperate
+ttk.Separator(dashboard_frame, orient='horizontal').pack(fill='x', pady=10)
+
+# action
+action_section = tk.Frame(dashboard_frame, bg="#42d2d0", padx=10, pady=10)
+action_section.pack(pady=5, fill="x")
+
+tk.Label(action_section, text="🔧 Quick Actions", font=("Arial", 12, "bold"), bg="#42d2d0", fg="black").pack(anchor="w")
+
+tk.Button(action_section, text="👥 Manage Groups", font=("Arial", 11), command=view_groups).pack(fill="x", pady=2)
+tk.Button(action_section, text="➕ Add Expense", font=("Arial", 11, "bold"),
+          command=lambda: [update_groups_in_expense_combo(), show_frame(expense_frame)]).pack(fill="x", pady=2)
+tk.Button(action_section, text="💾 Export Expenses (CSV)", font=("Arial", 11), command=export_expenses).pack(fill="x", pady=2)
+tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11), command=view_monthly_summary).pack(fill="x", pady=2)
+tk.Button(action_section, text="⚙️ Settings", font=("Arial", 11), command=open_settings).pack(fill="x", pady=2)
+tk.Button(action_section, text="📜 View Expense History", font=("Arial", 11), command=show_expense_history).pack(fill="x", pady=2)
+tk.Button(dashboard_frame, text="\u21AA Logout", command=logout_user).pack(side="bottom", fill="x", pady=10)
+
 
 # --- Expense Frame ---
 tk.Label(expense_frame, text="Add Expense", font=("Arial", 16)).pack(pady=10)
@@ -659,7 +733,7 @@ tk.Button(settings_frame, text="Logout", command=logout_user).pack(pady=5)
 tk.Button(settings_frame, text="Deactivate Account", command=deactivate_account).pack(pady=5)
 tk.Button(settings_frame, text="Delete Account", command=delete_account).pack(pady=5)
 tk.Button(settings_frame, text="Back to Dashboard", command=lambda: [load_notification_setting(), show_frame(dashboard_frame)]).pack(pady=5)
-tk.Button(dashboard_frame, text="⏳ View Expense History", command=show_expense_history).pack(pady=5)
+
 
 
 #Auto-Fill Login Email if Remember Me was Used
