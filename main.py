@@ -224,6 +224,26 @@ def view_monthly_summary():
     else:
         messagebox.showinfo("Summary", "No expenses to show.")
 
+def show_expense_history():
+    history_text.delete(1.0, tk.END)
+    cursor.execute("""
+        SELECT e.date, e.amount, e.description, g.group_name
+        FROM expenses e
+        LEFT JOIN groups g ON g.owner_email = e.user_email
+        WHERE e.user_email=?
+        ORDER BY e.date DESC
+    """, (logged_in_email,))
+    rows = cursor.fetchall()
+    if not rows:
+        history_text.insert(tk.END, "No expenses to show.\n")
+        return
+
+    for date, amount, desc, group in rows:
+        history_text.insert(tk.END, f"{date} | ${amount:.2f} | {desc or 'No description'} | Group: {group or 'N/A'}\n")
+
+    show_frame(history_frame)
+
+
 def add_group():
     name = group_name_entry.get().strip()
     if name:
