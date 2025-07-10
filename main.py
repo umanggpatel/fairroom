@@ -122,6 +122,7 @@ def get_remember_email():
             return f.read().strip()
     return ""
 
+# Login and Registration
 def login_user():
     global logged_in_email
     email = login_email.get().strip().lower()
