@@ -18,7 +18,9 @@ cursor.execute("""
         first_name TEXT NOT NULL,
         last_name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        active INTEGER DEFAULT 1,
+        notifications_enabled INTEGER DEFAULT 1
     )
 """)
 cursor.execute("""
@@ -103,21 +105,42 @@ def show_frame(frame):
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+# --- Remember Me setup ---
+remember_var = tk.IntVar(value=0)
+
+def save_remember_email(email):
+    with open("remember_me.txt", "w") as f:
+        f.write(email)
+
+def clear_remember_email():
+    if os.path.exists("remember_me.txt"):
+        os.remove("remember_me.txt")
+
+def get_remember_email():
+    if os.path.exists("remember_me.txt"):
+        with open("remember_me.txt", "r") as f:
+            return f.read().strip()
+    return ""
+
 def login_user():
     global logged_in_email
     email = login_email.get().strip().lower()
     password = hash_password(login_password.get().strip())
-    cursor.execute("SELECT * FROM users WHERE email=? AND password=?", (email, password))
+    cursor.execute("SELECT * FROM users WHERE email=? AND password=? AND active=1", (email, password))
     user = cursor.fetchone()
     if user:
         logged_in_email = email
+        if remember_var.get():
+            save_remember_email(email)
+        else:
+            clear_remember_email()
         dashboard_greeting.config(text=f"Welcome, {user[1]} {user[2]} 👋")
         update_activity_feed()
         update_groups_in_expense_combo()
         view_groups()
         show_frame(dashboard_frame)
     else:
-        messagebox.showerror("Login Failed", "Invalid email or password.")
+        messagebox.showerror("Login Failed", "Invalid email/password or account deactivated.")
 
 def register_user():
     fname = reg_fname.get().strip()
@@ -143,7 +166,6 @@ def update_activity_feed():
         activity_text.insert(tk.END, f"• {activity} ({timestamp})\n")
 
 def export_expenses():
-    # Ask user if want to filter by group or export all
     groups = expense_group_combo['values']
     filter_group = None
     if groups:
@@ -252,6 +274,7 @@ def view_groups():
     show_frame(group_frame)
 
 def open_settings():
+    load_notification_setting()
     show_frame(settings_frame)
 
 def change_password():
@@ -292,11 +315,9 @@ def view_group_members():
     
     lines = []
     for member in members:
-        # Total paid by this member (sum of expenses user created)
         cursor.execute("SELECT IFNULL(SUM(amount),0) FROM expenses WHERE user_email=?", (member,))
         total_paid = cursor.fetchone()[0]
 
-        # Total owed by this member (sum of splits assigned)
         cursor.execute("""
             SELECT IFNULL(SUM(amount),0) FROM expense_splits
             WHERE member_email=? AND expense_id IN (
@@ -314,10 +335,9 @@ def view_group_members():
     messagebox.showinfo(f"Group Members & Balances - {group_name}", info_text)
 
 # --- Expense Split UI additions ---
-
 split_type_var = tk.StringVar(value="equal")  # default split type
 
-custom_split_frame = None
+custom_split_frame = tk.Frame(expense_frame)
 custom_entries = {}
 
 def load_group_members_for_split():
@@ -441,15 +461,64 @@ def add_expense():
     except ValueError:
         messagebox.showerror("Error", "Invalid amount")
 
+# === Settings additions ===
+
+notif_var = tk.IntVar()
+
+def logout_user():
+    global logged_in_email
+    logged_in_email = None
+    show_frame(login_frame)
+
+def deactivate_account():
+    if messagebox.askyesno("Confirm", "Deactivate your account? You won't be able to login until reactivated."):
+        cursor.execute("UPDATE users SET active=0 WHERE email=?", (logged_in_email,))
+        conn.commit()
+        messagebox.showinfo("Account Deactivated", "Your account has been deactivated.")
+        logout_user()
+
+def delete_account():
+    if messagebox.askyesno("Confirm", "Delete your account and all associated data? This cannot be undone."):
+        cursor.execute("DELETE FROM expense_splits WHERE member_email=?", (logged_in_email,))
+        cursor.execute("DELETE FROM expenses WHERE user_email=?", (logged_in_email,))
+        cursor.execute("DELETE FROM group_members WHERE member_email=?", (logged_in_email,))
+        cursor.execute("SELECT id FROM groups WHERE owner_email=?", (logged_in_email,))
+        groups_owned = cursor.fetchall()
+        for (gid,) in groups_owned:
+            cursor.execute("DELETE FROM group_members WHERE group_id=?", (gid,))
+        cursor.execute("DELETE FROM groups WHERE owner_email=?", (logged_in_email,))
+        cursor.execute("DELETE FROM activities WHERE user_email=?", (logged_in_email,))
+        cursor.execute("DELETE FROM users WHERE email=?", (logged_in_email,))
+        conn.commit()
+        messagebox.showinfo("Account Deleted", "Your account and all data have been deleted.")
+        logout_user()
+
+def toggle_notifications():
+    val = 1 if notif_var.get() else 0
+    cursor.execute("UPDATE users SET notifications_enabled=? WHERE email=?", (val, logged_in_email))
+    conn.commit()
+    messagebox.showinfo("Settings", f"Notifications {'enabled' if val else 'disabled'}.")
+
+def load_notification_setting():
+    cursor.execute("SELECT notifications_enabled FROM users WHERE email=?", (logged_in_email,))
+    res = cursor.fetchone()
+    if res:
+        notif_var.set(res[0])
+
 # === UI Code ===
 
 # --- Login Frame ---
 tk.Label(login_frame, text="Email").pack(pady=5)
 login_email = tk.Entry(login_frame)
 login_email.pack(pady=5)
+
 tk.Label(login_frame, text="Password").pack(pady=5)
 login_password = tk.Entry(login_frame, show="*")
 login_password.pack(pady=5)
+
+remember_checkbox = tk.Checkbutton(login_frame, text="Remember Me", variable=remember_var)
+remember_checkbox.pack()
+
 tk.Button(login_frame, text="Login", command=login_user).pack(pady=10)
 
 tk.Label(login_frame, text="--- OR Register ---").pack(pady=10)
@@ -479,7 +548,7 @@ tk.Button(dashboard_frame, text="Add Expense", command=lambda: [update_groups_in
 tk.Button(dashboard_frame, text="Export My Expenses (CSV)", command=export_expenses).pack(pady=5)
 tk.Button(dashboard_frame, text="View Monthly Expense Summary", command=view_monthly_summary).pack(pady=5)
 tk.Button(dashboard_frame, text="Settings", command=open_settings).pack(pady=5)
-tk.Button(dashboard_frame, text="Logout", command=lambda: show_frame(login_frame)).pack(pady=5)
+tk.Button(dashboard_frame, text="Logout", command=logout_user).pack(pady=5)
 
 # --- Expense Frame ---
 tk.Label(expense_frame, text="Add Expense", font=("Arial", 16)).pack(pady=10)
@@ -500,7 +569,6 @@ split_equal_rb.pack()
 split_custom_rb = tk.Radiobutton(expense_frame, text="Custom Split", variable=split_type_var, value="custom", command=toggle_custom_split)
 split_custom_rb.pack()
 
-custom_split_frame = tk.Frame(expense_frame)
 custom_split_frame.pack_forget()
 
 tk.Button(expense_frame, text="Add Expense with Split", command=add_expense).pack(pady=10)
@@ -533,9 +601,20 @@ tk.Label(settings_frame, text="New Password").pack()
 new_password_entry = tk.Entry(settings_frame, show="*")
 new_password_entry.pack(pady=5)
 tk.Button(settings_frame, text="Update Password", command=change_password).pack(pady=10)
-tk.Button(settings_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
+
+tk.Checkbutton(settings_frame, text="Enable Notifications", variable=notif_var, command=toggle_notifications).pack(pady=5)
+
+tk.Button(settings_frame, text="Logout", command=logout_user).pack(pady=5)
+tk.Button(settings_frame, text="Deactivate Account", command=deactivate_account).pack(pady=5)
+tk.Button(settings_frame, text="Delete Account", command=delete_account).pack(pady=5)
+tk.Button(settings_frame, text="Back to Dashboard", command=lambda: [load_notification_setting(), show_frame(dashboard_frame)]).pack(pady=5)
+
+
+saved_email = get_remember_email()
+if saved_email:
+    login_email.insert(0, saved_email)
+    remember_var.set(1)
 
 show_frame(login_frame)
 root.mainloop()
-
 
