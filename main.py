@@ -6,11 +6,12 @@ import hashlib
 import csv
 
 # === Setup SQLite DB ===
-if os.path.exists("users.db"):
-    os.remove("users.db")
-
-conn = sqlite3.connect("users.db")
-cursor = conn.cursor()
+if not os.path.exists("users.db"):
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+else:
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
 
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -65,21 +66,22 @@ cursor.execute("""
 """)
 conn.commit()
 
+
 root = tk.Tk()
 root.title("Expense & Group Manager")
 root.geometry("400x850")
-root.configure(bg="#f0f0f0")
+root.configure(bg="#eaf6f9")
 
 style = ttk.Style()
 style.theme_use("clam")
 style.configure("Custom.TButton",
-    background="#4caf50",
+    background="#00796b",
     foreground="white",
     font=("Arial", 11, "bold"),
     padding=10
 )
 style.map("Custom.TButton",
-    background=[("active", "#45a049")],
+    background=[("active", "#00695c")],
     foreground=[("active", "white")]
 )
 style.configure("RoundedEntry.TEntry", relief="flat", padding=6, borderwidth=1, font=("Arial", 12))
@@ -90,14 +92,14 @@ root.grid_columnconfigure(0, weight=1)
 logged_in_email = None
 
 # === Frames ===
-login_frame = tk.Frame(root, bg="#87d188")
-register_frame = tk.Frame(root, bg="#ffccbc")
-dashboard_frame = tk.Frame(root, bg="#a5d6a7")
-expense_frame = tk.Frame(root, bg="#fff3e0")
-group_frame = tk.Frame(root, bg="#ede7f6")
-settings_frame = tk.Frame(root, bg="#d7ccc8")
+login_frame = tk.Frame(root, bg="#6babc3")
+register_frame = tk.Frame(root, bg="#6babc3")
+dashboard_frame = tk.Frame(root, bg="#6babc3")
+expense_frame = tk.Frame(root, bg="#6babc3")
+group_frame = tk.Frame(root, bg="#6babc3")
+settings_frame = tk.Frame(root, bg="#6babc3")
 
-history_frame = tk.Frame(root, bg="#ffe0b2")
+history_frame = tk.Frame(root, bg="#6babc3")
 
 
 for frame in (login_frame,register_frame, dashboard_frame, expense_frame, group_frame, settings_frame, history_frame):
@@ -593,11 +595,11 @@ activity_text = tk.Text(dashboard_frame, height=10, width=45)
 activity_text.pack(pady=5)
 
 tk.Button(dashboard_frame, text="Manage Groups (Create/Add Members)", command=view_groups).pack(pady=5)
-tk.Button(dashboard_frame, text="Add Expense", command=lambda: [update_groups_in_expense_combo(), show_frame(expense_frame)]).pack(pady=5)
-tk.Button(dashboard_frame, text="Export My Expenses (CSV)", command=export_expenses).pack(pady=5)
-tk.Button(dashboard_frame, text="View Monthly Expense Summary", command=view_monthly_summary).pack(pady=5)
-tk.Button(dashboard_frame, text="Settings", command=open_settings).pack(pady=5)
-tk.Button(dashboard_frame, text="Logout", command=logout_user).pack(pady=5)
+tk.Button(dashboard_frame, text="➕ Add Expense", font=("Arial", 11, "bold"), command=lambda: [update_groups_in_expense_combo(), show_frame(expense_frame)]).pack(pady=5)
+tk.Button(dashboard_frame, text="💾 Export My Expenses (CSV)", command=export_expenses).pack(pady=5)
+tk.Button(dashboard_frame, text=" 📊 View Monthly Expense Summary", command=view_monthly_summary).pack(pady=5)
+tk.Button(dashboard_frame, text="⚙️ Settings", command=open_settings).pack(pady=5)
+tk.Button(dashboard_frame, text="\u21AA Logout", command=logout_user).pack(pady=5)
 
 # --- Expense Frame ---
 tk.Label(expense_frame, text="Add Expense", font=("Arial", 16)).pack(pady=10)
@@ -657,7 +659,7 @@ tk.Button(settings_frame, text="Logout", command=logout_user).pack(pady=5)
 tk.Button(settings_frame, text="Deactivate Account", command=deactivate_account).pack(pady=5)
 tk.Button(settings_frame, text="Delete Account", command=delete_account).pack(pady=5)
 tk.Button(settings_frame, text="Back to Dashboard", command=lambda: [load_notification_setting(), show_frame(dashboard_frame)]).pack(pady=5)
-tk.Button(dashboard_frame, text="View Expense History", command=show_expense_history).pack(pady=5)
+tk.Button(dashboard_frame, text="⏳ View Expense History", command=show_expense_history).pack(pady=5)
 
 
 #Auto-Fill Login Email if Remember Me was Used
