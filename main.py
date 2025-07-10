@@ -1,13 +1,9 @@
 import tkinter as tk
-from tkinter import messagebox, ttk, filedialog, simpledialog
+from tkinter import messagebox, ttk, filedialog
 import sqlite3
 import os
-from datetime import datetime, timedelta
 import hashlib
-import random
-import string
 import csv
-
 
 # === Setup SQLite DB ===
 if os.path.exists("users.db"):
@@ -26,30 +22,54 @@ cursor.execute("""
     )
 """)
 cursor.execute("""
-    CREATE TABLE IF NOT EXISTS balances (
+    CREATE TABLE IF NOT EXISTS activities (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_email TEXT NOT NULL,
-        other_party TEXT NOT NULL,
+        activity TEXT NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+""")
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
         amount REAL NOT NULL,
-        type TEXT CHECK(type IN ('owes_you', 'you_owe')) NOT NULL
+        description TEXT,
+        date DATE DEFAULT CURRENT_DATE
+    )
+""")
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT NOT NULL,
+        owner_email TEXT NOT NULL
+    )
+""")
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS group_members (
+        group_id INTEGER,
+        member_email TEXT,
+        FOREIGN KEY(group_id) REFERENCES groups(id)
+    )
+""")
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS expense_splits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        expense_id INTEGER,
+        member_email TEXT,
+        amount REAL,
+        FOREIGN KEY(expense_id) REFERENCES expenses(id)
     )
 """)
 conn.commit()
 
-# === Main Window ===
-
-
 root = tk.Tk()
-root.title("Login & Register")
-root.geometry("400x500")
+root.title("Expense & Group Manager")
+root.geometry("400x850")
 root.configure(bg="#f0f0f0")
 
 style = ttk.Style()
-style.theme_use("clam")  
-
-
-
-# Define a custom button style
+style.theme_use("clam")
 style.configure("Custom.TButton",
     background="#4caf50",
     foreground="white",
@@ -60,247 +80,462 @@ style.map("Custom.TButton",
     background=[("active", "#45a049")],
     foreground=[("active", "white")]
 )
-
 style.configure("RoundedEntry.TEntry", relief="flat", padding=6, borderwidth=1, font=("Arial", 12))
+
 root.grid_rowconfigure(0, weight=1)
 root.grid_columnconfigure(0, weight=1)
 
+logged_in_email = None
 
-# Style Configuration 
-#style = ttk.Style()
-#style.theme_use("clam")  # Use a flat modern theme
-#style.configure("RoundedEntry.TEntry", relief="flat", padding=6, borderwidth=1, font=("Arial", 12))
+# === Frames ===
+login_frame = tk.Frame(root, bg="#e0f7fa")
+dashboard_frame = tk.Frame(root, bg="#a5d6a7")
+expense_frame = tk.Frame(root, bg="#fff3e0")
+group_frame = tk.Frame(root, bg="#ede7f6")
+settings_frame = tk.Frame(root, bg="#d7ccc8")
 
+for frame in (login_frame, dashboard_frame, expense_frame, group_frame, settings_frame):
+    frame.grid(row=0, column=0, sticky='nsew')
 
-# === Frame Switching ===
 def show_frame(frame):
     frame.tkraise()
 
-# === Register User ===
-def register_user():
-    fname = entry_fname.get().strip()
-    lname = entry_lname.get().strip()
-    email = entry_email.get().strip().lower()
-    password = entry_pass_reg.get().strip()
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
+def login_user():
+    global logged_in_email
+    email = login_email.get().strip().lower()
+    password = hash_password(login_password.get().strip())
+    cursor.execute("SELECT * FROM users WHERE email=? AND password=?", (email, password))
+    user = cursor.fetchone()
+    if user:
+        logged_in_email = email
+        dashboard_greeting.config(text=f"Welcome, {user[1]} {user[2]} 👋")
+        update_activity_feed()
+        update_groups_in_expense_combo()
+        view_groups()
+        show_frame(dashboard_frame)
+    else:
+        messagebox.showerror("Login Failed", "Invalid email or password.")
+
+def register_user():
+    fname = reg_fname.get().strip()
+    lname = reg_lname.get().strip()
+    email = reg_email.get().strip().lower()
+    password = hash_password(reg_password.get().strip())
     if not fname or not lname or not email or not password:
         messagebox.showerror("Error", "Please fill all fields.")
         return
-
     try:
         cursor.execute("INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)",
                        (fname, lname, email, password))
         conn.commit()
         messagebox.showinfo("Success", "Registered successfully!")
-        clear_fields()
-        show_frame(login_frame)
     except sqlite3.IntegrityError:
         messagebox.showerror("Error", "Email already exists.")
 
-# === Login User ===
-def login_user():
-    global logged_in_email
-    email = entry_email_login.get().strip().lower()
-    password = entry_pass_login.get().strip()
-
-    cursor.execute("SELECT * FROM users WHERE email=? AND password=?", (email, password))
-    user = cursor.fetchone()
-
-    if user:
-        full_name = f"{user[1]} {user[2]}"
-        dashboard_greeting.config(text=f"Welcome, {full_name} 👋")
-        logged_in_email=email
-        messagebox.showinfo("Welcome", f"Welcome, {full_name}!")
-        clear_fields()
-        show_frame(dashboard_frame)
-    else:
-        messagebox.showerror("Login Failed", "Invalid email or password.")
-        
-#  Clear All Inputs
-def clear_fields():
-    entry_fname.delete(0, tk.END)
-    entry_lname.delete(0, tk.END)
-    entry_email.delete(0, tk.END)
-    entry_pass_reg.delete(0, tk.END)
-    entry_email_login.delete(0, tk.END)
-    entry_pass_login.delete(0, tk.END)
-
-#View Balance
-def update_balances_view():
-    balances_list.delete(1.0, tk.END)
-    cursor.execute("SELECT other_party, amount, type FROM balances WHERE user_email=?", (logged_in_email,))
+def update_activity_feed():
+    activity_text.delete(1.0, tk.END)
+    cursor.execute("SELECT activity, timestamp FROM activities WHERE user_email=? ORDER BY timestamp DESC LIMIT 10", (logged_in_email,))
     rows = cursor.fetchall()
+    for activity, timestamp in rows:
+        activity_text.insert(tk.END, f"• {activity} ({timestamp})\n")
 
-    if not rows:
-        balances_list.insert(tk.END, "No balances found.\n")
+def export_expenses():
+    # Ask user if want to filter by group or export all
+    groups = expense_group_combo['values']
+    filter_group = None
+    if groups:
+        res = messagebox.askyesno("Export Expenses", "Export expenses for selected group only?")
+        if res:
+            filter_group = expense_group_combo.get()
+
+    file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+    if not file_path:
+        return
+
+    with open(file_path, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["User Email", "Amount", "Description", "Date", "Group"])
+        if filter_group:
+            cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (filter_group, logged_in_email))
+            gid = cursor.fetchone()
+            if not gid:
+                messagebox.showerror("Error", "Group not found.")
+                return
+            gid = gid[0]
+            cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid,))
+            members = [row[0] for row in cursor.fetchall()]
+            if not members:
+                messagebox.showinfo("Export", "No members in this group.")
+                return
+            query = f"""
+                SELECT user_email, amount, description, date FROM expenses
+                WHERE user_email IN ({','.join('?'*len(members))})
+            """
+            cursor.execute(query, members)
+        else:
+            cursor.execute("SELECT user_email, amount, description, date FROM expenses WHERE user_email=?", (logged_in_email,))
+        rows = cursor.fetchall()
+        for row in rows:
+            writer.writerow([row[0], row[1], row[2] if row[2] else "", row[3], filter_group if filter_group else "All"])
+    messagebox.showinfo("Export", f"Expenses exported successfully to:\n{file_path}")
+
+def view_monthly_summary():
+    cursor.execute("""
+        SELECT strftime('%Y-%m', date) as month, SUM(amount)
+        FROM expenses
+        WHERE user_email=?
+        GROUP BY month
+        ORDER BY month
+    """, (logged_in_email,))
+    data = cursor.fetchall()
+    if data:
+        summary_lines = [f"{month}: ${total:.2f}" for month, total in data]
+        summary_text = "\n".join(summary_lines)
+        messagebox.showinfo("Monthly Expenses Summary", summary_text)
     else:
-        for party, amt, typ in rows:
-            if typ == "you_owe":
-                balances_list.insert(tk.END, f"You owe {party}: ${amt:.2f}\n")
-            else:
-                balances_list.insert(tk.END, f"{party} owes you: ${amt:.2f}\n")
+        messagebox.showinfo("Summary", "No expenses to show.")
 
-    show_frame(view_balances_frame)
-
-# Frames
-register_frame = tk.Frame(root,bg="#519b71")
-login_frame = tk.Frame(root,bg="#49A475")
-dashboard_frame = tk.Frame(root,bg="#547a33")
-view_balances_frame = tk.Frame(root, bg="#f0f0f0")
-
-# personalized greeting
-dashboard_greeting = tk.Label(dashboard_frame, text="", font=("Arial", 14))
-dashboard_greeting.pack(pady=5)
-
-# Summary Panel
-summary_frame = tk.Frame(dashboard_frame)
-summary_frame.pack(pady=10)
-
-label_total_paid = tk.Label(summary_frame, text="Total expenses paid: $0")
-label_total_paid.pack(anchor='w')
-
-label_total_owed_to_you = tk.Label(summary_frame, text="Total owed by others: $0")
-label_total_owed_to_you.pack(anchor='w')
-
-label_you_owe = tk.Label(summary_frame, text="You owe: $0")
-label_you_owe.pack(anchor='w')
-
-label_last_activity = tk.Label(summary_frame, text="Last activity: None")
-label_last_activity.pack(anchor='w')
-
-# Dashboard Action Buttons
-#btn_frame = tk.Frame(dashboard_frame)
-#btn_frame.pack(pady=10)
-
-#tk.Button(btn_frame, text="Add New Expense", width=18,bg="#2287e0").grid(row=0, column=0, padx=5, pady=5)
-#tk.Button(btn_frame, text="View My Groups", width=18,bg="#67a1d3").grid(row=0, column=1, padx=5, pady=5)
-#tk.Button(btn_frame, text="Monthly Summary", width=18,bg="#cfe2f3").grid(row=1, column=0, padx=5, pady=5)
-#tk.Button(btn_frame, text="Settings", width=18,bg="#cfe2f3").grid(row=1, column=1, padx=5, pady=5)
-
-btn_frame = ttk.Frame(dashboard_frame)
-btn_frame.pack(pady=20)
-
-button_labels = [
-    ("➕ Add Expense", lambda: None),
-    ("👥 View Groups", lambda: None),
-    ("📊 Monthly Summary", lambda: None),
-    ("⚙️ Settings", lambda: None),
-    ("View Balances", update_balances_view),
-    ("Logout", lambda: show_frame(login_frame))
-]
-
-for idx, (text,command) in enumerate(button_labels):
-    ttk.Button(
-        btn_frame,
-        text=text,
-        command=command,
-        style="Custom.TButton",
-        width=22
-    ).grid(row=idx // 2, column=idx % 2, padx=12, pady=12)
-
-
-# Recent Activity Feed
-tk.Label(dashboard_frame, text="Recent Activity", font=("Arial", 14)).pack(pady=10)
-
-activity_text = tk.Text(dashboard_frame, height=5, width=45)
-activity_text.pack()
-activity_text.insert(tk.END, "• You added: $440 - Rent \n")
-activity_text.insert(tk.END, "• Rhiya paid: $20 - Toilet Paper\n")
-activity_text.insert(tk.END, "• You owe: $15 to Ayush for Dinner\n")
-# Expense Split Section
-split_section = tk.LabelFrame(dashboard_frame, text="Choose Split Method", padx=10, pady=10)
-split_section.pack(pady=15)
-
-split_type = tk.StringVar(value="Equal")
-
-tk.Label(split_section, text="Split Type:").pack()
-
-dropdown = tk.OptionMenu(split_section, split_type, "Equal", "Custom")
-dropdown.pack()
-
-# Frame for custom input fields (initially hidden)
-custom_frame = tk.Frame(split_section)
-
-def on_split_change(*args):
-    if split_type.get() == "Custom":
-        custom_frame.pack(pady=5)
+def add_group():
+    name = group_name_entry.get().strip()
+    if name:
+        cursor.execute("INSERT INTO groups (group_name, owner_email) VALUES (?, ?)", (name, logged_in_email))
+        group_id = cursor.lastrowid
+        cursor.execute("INSERT INTO group_members (group_id, member_email) VALUES (?, ?)", (group_id, logged_in_email))
+        conn.commit()
+        messagebox.showinfo("Success", "Group created and you have been added.")
+        group_name_entry.delete(0, tk.END)
+        view_groups()
+        update_groups_in_expense_combo()
     else:
-        custom_frame.forget()
+        messagebox.showerror("Error", "Please enter a group name.")
 
-split_type.trace("w", on_split_change)
+def add_member_to_group():
+    try:
+        selection = group_list.curselection()
+        if not selection:
+            messagebox.showerror("Error", "Please select a group from the list.")
+            return
+        group = group_list.get(selection[0])
+        new_member = member_email_entry.get().strip().lower()
+        if not new_member:
+            messagebox.showerror("Error", "Enter member email to add.")
+            return
+        cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (group, logged_in_email))
+        gid = cursor.fetchone()
+        if gid:
+            cursor.execute("SELECT * FROM group_members WHERE group_id=? AND member_email=?", (gid[0], new_member))
+            if cursor.fetchone():
+                messagebox.showinfo("Info", f"{new_member} is already a member of {group}.")
+                return
+            cursor.execute("INSERT INTO group_members (group_id, member_email) VALUES (?, ?)", (gid[0], new_member))
+            conn.commit()
+            messagebox.showinfo("Success", f"{new_member} added to {group}.")
+            member_email_entry.delete(0, tk.END)
+            update_groups_in_expense_combo()
+        else:
+            messagebox.showerror("Error", "Group not found or you are not the owner.")
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
 
-tk.Label(custom_frame, text="User 1 Amount ($):").pack()
-tk.Entry(custom_frame).pack()
+def view_groups():
+    group_list.delete(0, tk.END)
+    cursor.execute("""
+        SELECT g.group_name FROM groups g
+        JOIN group_members m ON g.id = m.group_id
+        WHERE m.member_email=?
+    """, (logged_in_email,))
+    for row in cursor.fetchall():
+        group_list.insert(tk.END, row[0])
+    show_frame(group_frame)
 
-tk.Label(custom_frame, text="User 2 Amount ($):").pack()
-tk.Entry(custom_frame).pack()
+def open_settings():
+    show_frame(settings_frame)
 
-#Logout Button
-tk.Button(dashboard_frame, text="Log Out", command=lambda: show_frame(login_frame),bg="#4f7faa").pack(pady=10)
+def change_password():
+    current = hash_password(current_password_entry.get())
+    new = hash_password(new_password_entry.get())
+    cursor.execute("SELECT * FROM users WHERE email=? AND password=?", (logged_in_email, current))
+    if cursor.fetchone():
+        if not new_password_entry.get():
+            messagebox.showerror("Error", "New password cannot be empty.")
+            return
+        cursor.execute("UPDATE users SET password=? WHERE email=?", (new, logged_in_email))
+        conn.commit()
+        messagebox.showinfo("Success", "Password updated.")
+        current_password_entry.delete(0, tk.END)
+        new_password_entry.delete(0, tk.END)
+    else:
+        messagebox.showerror("Error", "Current password is incorrect.")
 
+def view_group_members():
+    selection = group_list.curselection()
+    if not selection:
+        messagebox.showerror("Error", "Please select a group from the list.")
+        return
+    group_name = group_list.get(selection[0])
+    
+    cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (group_name, logged_in_email))
+    gid_res = cursor.fetchone()
+    if not gid_res:
+        messagebox.showerror("Error", "Group not found or you are not the owner.")
+        return
+    gid = gid_res[0]
+    
+    cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid,))
+    members = [row[0] for row in cursor.fetchall()]
+    if not members:
+        messagebox.showinfo("Group Members", "No members in this group.")
+        return
+    
+    lines = []
+    for member in members:
+        # Total paid by this member (sum of expenses user created)
+        cursor.execute("SELECT IFNULL(SUM(amount),0) FROM expenses WHERE user_email=?", (member,))
+        total_paid = cursor.fetchone()[0]
 
+        # Total owed by this member (sum of splits assigned)
+        cursor.execute("""
+            SELECT IFNULL(SUM(amount),0) FROM expense_splits
+            WHERE member_email=? AND expense_id IN (
+                SELECT id FROM expenses WHERE user_email IN (
+                    SELECT member_email FROM group_members WHERE group_id=?
+                )
+            )
+        """, (member, gid))
+        total_owed = cursor.fetchone()[0]
 
-#for frame in (register_frame, login_frame, dashboard_frame):
-    #frame.grid(row=0, column=0, sticky='nsew')
+        net_balance = total_paid - total_owed
+        lines.append(f"{member}\n  Paid: ${total_paid:.2f}\n  Owes: ${total_owed:.2f}\n  Net: ${net_balance:.2f}\n")
 
-    #View Balance frame
-tk.Label(view_balances_frame, text="Your Balances", font=("Arial", 16)).pack(pady=10)
-balances_list = tk.Text(view_balances_frame, height=10, width=45)
-balances_list.pack(pady=10)
-tk.Button(view_balances_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=10)
+    info_text = f"Group '{group_name}' financials:\n\n" + "\n".join(lines)
+    messagebox.showinfo(f"Group Members & Balances - {group_name}", info_text)
 
-# Register Frame UI
-tk.Label(register_frame, text="Register", font=("Arial", 18)).pack(pady=10)
+# --- Expense Split UI additions ---
 
-tk.Label(register_frame, text="First Name").pack()
-entry_fname = tk.Entry(register_frame, width=30)
-entry_fname.pack()
+split_type_var = tk.StringVar(value="equal")  # default split type
 
-tk.Label(register_frame, text="Last Name").pack()
-entry_lname = tk.Entry(register_frame, width=30)
-entry_lname.pack()
+custom_split_frame = None
+custom_entries = {}
 
-tk.Label(register_frame, text="Email").pack()
-entry_email = tk.Entry(register_frame, width=30)
-entry_email.pack()
+def load_group_members_for_split():
+    global custom_entries
+    custom_entries.clear()
+    for widget in custom_split_frame.winfo_children():
+        widget.destroy()
+    selected_group = expense_group_combo.get()
+    if not selected_group:
+        return
+    cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (selected_group, logged_in_email))
+    gid = cursor.fetchone()
+    if not gid:
+        return
+    cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid[0],))
+    members = cursor.fetchall()
+    for (member_email,) in members:
+        lbl = tk.Label(custom_split_frame, text=member_email)
+        lbl.pack(side="left", padx=5)
+        ent = tk.Entry(custom_split_frame, width=8)
+        ent.pack(side="left", padx=5)
+        custom_entries[member_email] = ent
 
-tk.Label(register_frame, text="Password").pack()
-entry_pass_reg = tk.Entry(register_frame, show="*", width=30)
-entry_pass_reg.pack()
+def toggle_custom_split():
+    if split_type_var.get() == "custom":
+        load_group_members_for_split()
+        custom_split_frame.pack(pady=5, fill="x")
+    else:
+        for widget in custom_split_frame.winfo_children():
+            widget.destroy()
+        custom_split_frame.pack_forget()
 
-tk.Button(register_frame, text="Register", command=register_user,bg="#d9ead3").pack(pady=10)
-tk.Button(register_frame, text="Already registered? Login", command=lambda: show_frame(login_frame)).pack()
+def update_groups_in_expense_combo():
+    cursor.execute("""
+        SELECT g.group_name FROM groups g
+        JOIN group_members m ON g.id = m.group_id
+        WHERE m.member_email=?
+    """, (logged_in_email,))
+    groups = [row[0] for row in cursor.fetchall()]
+    expense_group_combo['values'] = groups
+    if groups:
+        expense_group_combo.current(0)
+        toggle_custom_split()
+    else:
+        expense_group_combo.set("")
+        toggle_custom_split()
 
-#  Login Frame UI
-#  Login Frame UI (cleaned and styled)
-tk.Label(login_frame, text="Login", font=("Arial", 20, "bold"), bg="#49A475", fg="white").pack(pady=(30, 15))
+def add_expense():
+    try:
+        amount = float(expense_amount.get())
+        desc = expense_desc.get()
+        group_name = expense_group_combo.get()
+        if not group_name:
+            messagebox.showerror("Error", "Please select a group.")
+            return
 
-tk.Label(login_frame, text="Email", bg="#49A475", fg="white", font=("Arial", 12)).pack(pady=(5, 2))
-entry_email_login = ttk.Entry(login_frame, width=30, style="RoundedEntry.TEntry")
-entry_email_login.pack(pady=5)
-#entry_email_login = tk.Entry(login_frame, width=30, font=("Arial", 12), bg="white", fg="black", relief=tk.FLAT)
-#entry_email_login.pack(pady=(0, 10))
+        cursor.execute("INSERT INTO expenses (user_email, amount, description) VALUES (?, ?, ?)",
+                       (logged_in_email, amount, desc))
+        expense_id = cursor.lastrowid
 
-tk.Label(login_frame, text="Password", bg="#49A475", fg="white", font=("Arial", 12)).pack(pady=(5, 2))
-entry_pass_login = ttk.Entry(login_frame, width=30, style="RoundedEntry.TEntry", show="*")
-entry_pass_login.pack(pady=5)
-#entry_pass_login = tk.Entry(login_frame, show="*", width=30, font=("Arial", 12), bg="white", fg="black", relief=tk.FLAT)
-#entry_pass_login.pack(pady=(0, 15))
+        cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (group_name, logged_in_email))
+        gid = cursor.fetchone()
+        if not gid:
+            messagebox.showerror("Error", "Group not found or you are not the owner.")
+            return
+        gid = gid[0]
 
-tk.Button(login_frame, text="Login", command=login_user, bg="white", fg="#081abd", font=("Arial", 12, "bold"), relief=tk.GROOVE, width=15).pack(pady=10)
+        cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid,))
+        members = [row[0] for row in cursor.fetchall()]
+        if not members:
+            messagebox.showerror("Error", "No members in selected group.")
+            return
 
-# Account navigation
-tk.Label(login_frame, text="Don't have an account?", bg="#49A475", fg="white", font=("Arial", 10)).pack(pady=(20, 5))
-register_link = tk.Label(login_frame, text="Register Here", fg="yellow", bg="#49A475", cursor="hand2", font=('Arial', 10, 'underline'))
-register_link.pack()
-register_link.bind("<Button-1>", lambda e: show_frame(register_frame))
+        split_type = split_type_var.get()
 
-for frame in (register_frame, login_frame, dashboard_frame, view_balances_frame):
-    frame.grid(row=0, column=0, sticky='nsew')
+        if split_type == "equal":
+            split_amount = round(amount / len(members), 2)
+            total_assigned = split_amount * (len(members) - 1)
+            last_amount = round(amount - total_assigned, 2)
+            for i, member in enumerate(members):
+                amt = split_amount if i < len(members) - 1 else last_amount
+                cursor.execute("INSERT INTO expense_splits (expense_id, member_email, amount) VALUES (?, ?, ?)",
+                               (expense_id, member, amt))
 
-logged_in_email = None
+        elif split_type == "custom":
+            total_entered = 0
+            for member in members:
+                ent = custom_entries.get(member)
+                if not ent:
+                    messagebox.showerror("Error", "Missing custom amounts.")
+                    return
+                try:
+                    val = float(ent.get())
+                except:
+                    messagebox.showerror("Error", f"Invalid amount for {member}")
+                    return
+                total_entered += val
 
-# Start on register page for first use
-#show_frame(register_frame)
+            if round(total_entered, 2) != round(amount, 2):
+                messagebox.showerror("Error", f"Custom split amounts (${total_entered:.2f}) do not sum to total amount (${amount:.2f})")
+                return
+
+            for member in members:
+                val = float(custom_entries[member].get())
+                cursor.execute("INSERT INTO expense_splits (expense_id, member_email, amount) VALUES (?, ?, ?)",
+                               (expense_id, member, val))
+        else:
+            messagebox.showerror("Error", "Invalid split type selected.")
+            return
+
+        cursor.execute("INSERT INTO activities (user_email, activity) VALUES (?, ?)",
+                       (logged_in_email, f"Added expense: ${amount:.2f} - {desc} in group '{group_name}' split {split_type}"))
+        conn.commit()
+
+        messagebox.showinfo("Success", "Expense recorded with split.")
+        expense_amount.delete(0, tk.END)
+        expense_desc.delete(0, tk.END)
+        toggle_custom_split()
+        update_activity_feed()
+
+    except ValueError:
+        messagebox.showerror("Error", "Invalid amount")
+
+# === UI Code ===
+
+# --- Login Frame ---
+tk.Label(login_frame, text="Email").pack(pady=5)
+login_email = tk.Entry(login_frame)
+login_email.pack(pady=5)
+tk.Label(login_frame, text="Password").pack(pady=5)
+login_password = tk.Entry(login_frame, show="*")
+login_password.pack(pady=5)
+tk.Button(login_frame, text="Login", command=login_user).pack(pady=10)
+
+tk.Label(login_frame, text="--- OR Register ---").pack(pady=10)
+tk.Label(login_frame, text="First Name").pack()
+reg_fname = tk.Entry(login_frame)
+reg_fname.pack()
+tk.Label(login_frame, text="Last Name").pack()
+reg_lname = tk.Entry(login_frame)
+reg_lname.pack()
+tk.Label(login_frame, text="Email").pack()
+reg_email = tk.Entry(login_frame)
+reg_email.pack()
+tk.Label(login_frame, text="Password").pack()
+reg_password = tk.Entry(login_frame, show="*")
+reg_password.pack()
+tk.Button(login_frame, text="Register", command=register_user).pack(pady=10)
+
+# --- Dashboard Frame ---
+dashboard_greeting = tk.Label(dashboard_frame, text="Welcome!", font=("Arial", 16))
+dashboard_greeting.pack(pady=10)
+
+activity_text = tk.Text(dashboard_frame, height=10, width=45)
+activity_text.pack(pady=5)
+
+tk.Button(dashboard_frame, text="Manage Groups (Create/Add Members)", command=view_groups).pack(pady=5)
+tk.Button(dashboard_frame, text="Add Expense", command=lambda: [update_groups_in_expense_combo(), show_frame(expense_frame)]).pack(pady=5)
+tk.Button(dashboard_frame, text="Export My Expenses (CSV)", command=export_expenses).pack(pady=5)
+tk.Button(dashboard_frame, text="View Monthly Expense Summary", command=view_monthly_summary).pack(pady=5)
+tk.Button(dashboard_frame, text="Settings", command=open_settings).pack(pady=5)
+tk.Button(dashboard_frame, text="Logout", command=lambda: show_frame(login_frame)).pack(pady=5)
+
+# --- Expense Frame ---
+tk.Label(expense_frame, text="Add Expense", font=("Arial", 16)).pack(pady=10)
+tk.Label(expense_frame, text="Amount").pack()
+expense_amount = tk.Entry(expense_frame)
+expense_amount.pack(pady=5)
+tk.Label(expense_frame, text="Description").pack()
+expense_desc = tk.Entry(expense_frame)
+expense_desc.pack(pady=5)
+
+tk.Label(expense_frame, text="Select Group").pack(pady=5)
+expense_group_combo = ttk.Combobox(expense_frame, state="readonly")
+expense_group_combo.pack(pady=5)
+
+tk.Label(expense_frame, text="Split Type").pack(pady=5)
+split_equal_rb = tk.Radiobutton(expense_frame, text="Equal Split", variable=split_type_var, value="equal", command=toggle_custom_split)
+split_equal_rb.pack()
+split_custom_rb = tk.Radiobutton(expense_frame, text="Custom Split", variable=split_type_var, value="custom", command=toggle_custom_split)
+split_custom_rb.pack()
+
+custom_split_frame = tk.Frame(expense_frame)
+custom_split_frame.pack_forget()
+
+tk.Button(expense_frame, text="Add Expense with Split", command=add_expense).pack(pady=10)
+tk.Button(expense_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
+
+# --- Group Frame ---
+tk.Label(group_frame, text="Create New Group", font=("Arial", 16)).pack(pady=10)
+group_name_entry = tk.Entry(group_frame)
+group_name_entry.pack(pady=5)
+tk.Button(group_frame, text="Add Group", command=add_group).pack(pady=5)
+
+tk.Label(group_frame, text="Your Groups", font=("Arial", 14)).pack(pady=10)
+group_list = tk.Listbox(group_frame, height=8)
+group_list.pack(pady=5, fill="x")
+
+tk.Label(group_frame, text="Add Member Email").pack(pady=5)
+member_email_entry = tk.Entry(group_frame)
+member_email_entry.pack(pady=5)
+tk.Button(group_frame, text="Add Member to Selected Group", command=add_member_to_group).pack(pady=5)
+
+tk.Button(group_frame, text="View Group Members & Balances", command=view_group_members).pack(pady=10)
+tk.Button(group_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
+
+# --- Settings Frame ---
+tk.Label(settings_frame, text="Change Password", font=("Arial", 14)).pack(pady=10)
+tk.Label(settings_frame, text="Current Password").pack()
+current_password_entry = tk.Entry(settings_frame, show="*")
+current_password_entry.pack(pady=5)
+tk.Label(settings_frame, text="New Password").pack()
+new_password_entry = tk.Entry(settings_frame, show="*")
+new_password_entry.pack(pady=5)
+tk.Button(settings_frame, text="Update Password", command=change_password).pack(pady=10)
+tk.Button(settings_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
+
 show_frame(login_frame)
 root.mainloop()
+
+
