@@ -509,7 +509,16 @@ def load_notification_setting():
     if res:
         notif_var.set(res[0])
 
+
+
 # === UI Code ===
+
+
+# --- History Frame ---
+history_text = tk.Text(history_frame, height=30, width=50)
+history_text.pack(pady=10)
+tk.Button(history_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
+
 
 # --- Login Frame ---
 tk.Label(login_frame, text="Email").pack(pady=5)
