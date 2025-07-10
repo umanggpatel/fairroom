@@ -99,7 +99,7 @@ settings_frame = tk.Frame(root, bg="#d7ccc8")
 history_frame = tk.Frame(root, bg="#ffe0b2")
 
 
-for frame in (login_frame, dashboard_frame, expense_frame, group_frame, settings_frame):
+for frame in (login_frame, dashboard_frame, expense_frame, group_frame, settings_frame, history_frame):
     frame.grid(row=0, column=0, sticky='nsew')
 
 def show_frame(frame):
