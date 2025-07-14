@@ -4,6 +4,14 @@ import sqlite3
 import os
 import hashlib
 import csv
+from datetime import datetime, timedelta
+from monthly_summary_page import show_monthly_summary
+from tkcalendar import DateEntry
+
+
+
+
+
 
 # === Setup SQLite DB ===
 if not os.path.exists("users.db"):
@@ -74,6 +82,13 @@ cursor.execute("""
         type TEXT CHECK(type IN ('owes_you', 'you_owe')) NOT NULL
     )
 """)
+
+try:
+    cursor.execute("ALTER TABLE expenses ADD COLUMN category TEXT")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
 conn.commit()
 
 
@@ -107,6 +122,9 @@ login_frame = tk.Frame(root, bg="#6babc3")
 register_frame = tk.Frame(root, bg="#6babc3")
 dashboard_frame = tk.Frame(root, bg="#6babc3")
 expense_frame = tk.Frame(root, bg="#6babc3")
+monthly_summary_frame = tk.Frame(root, bg="white")
+monthly_summary_frame.place(x=0, y=0, relwidth=1, relheight=1)
+
 group_frame = tk.Frame(root, bg="#6babc3")
 settings_frame = tk.Frame(root, bg="#6babc3")
 
@@ -157,8 +175,11 @@ def login_user():
         update_groups_in_expense_combo()
         view_groups()
         show_frame(dashboard_frame)
+        
     else:
         messagebox.showerror("Login Failed", "Invalid email/password or account deactivated.")
+
+    
 
 def register_user():
     fname = reg_fname.get().strip()
@@ -176,12 +197,75 @@ def register_user():
     except sqlite3.IntegrityError:
         messagebox.showerror("Error", "Email already exists.")
 
+#def update_activity_feed():
+   # activity_text.delete(1.0, tk.END)
+    #cursor.execute("SELECT activity, timestamp FROM activities WHERE user_email=? ORDER BY timestamp DESC LIMIT 10", (logged_in_email,))
+    #rows = cursor.fetchall()
+    #for activity, timestamp in rows:
+       # activity_text.insert(tk.END, f"• {activity} ({timestamp})\n")
+def get_relative_time(past, now=None):
+    now = now or datetime.now()
+    diff = now - past
+
+    seconds = diff.total_seconds()
+    minutes = seconds // 60
+    hours = minutes // 60
+    days = diff.days
+
+    if seconds < 60:
+        return "just now"
+    elif minutes < 60:
+        return f"{int(minutes)} min ago"
+    elif hours < 24:
+        return f"{int(hours)} hr ago"
+    elif days == 1:
+        return "Yesterday"
+    elif days < 7:
+        return past.strftime("%A")  # e.g., "Monday"
+    else:
+        return past.strftime("%b %d")  # e.g., "Jul 05"
+
+
 def update_activity_feed():
+    activity_text.config(state="normal")
     activity_text.delete(1.0, tk.END)
-    cursor.execute("SELECT activity, timestamp FROM activities WHERE user_email=? ORDER BY timestamp DESC LIMIT 10", (logged_in_email,))
+
+    cursor.execute("""
+        SELECT activity, timestamp FROM activities
+        WHERE user_email=?
+        ORDER BY timestamp DESC
+        LIMIT 100
+    """, (logged_in_email,))
     rows = cursor.fetchall()
-    for activity, timestamp in rows:
-        activity_text.insert(tk.END, f"• {activity} ({timestamp})\n")
+
+    if not rows:
+        activity_text.insert("end", "No recent activity yet...\n", "default")
+    else:
+        now = datetime.now()
+
+        for activity, ts in rows:
+            ts_dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+            relative_time = get_relative_time(ts_dt, now)
+            date_str = ts_dt.strftime("%Y-%m-%d")
+
+            # Insert date (left) and relative time
+            activity_text.insert("end", f"📅 {date_str}   🕒 {relative_time}\n", "timestamp")
+
+            # Styled activity content
+            if "Added expense" in activity:
+                activity_text.insert("end", activity + "\n\n", "expense")
+            elif "Created group" in activity:
+                activity_text.insert("end", activity + "\n\n", "group")
+            elif "Added member" in activity:
+                activity_text.insert("end", activity + "\n\n", "member")
+            else:
+                activity_text.insert("end", activity + "\n\n", "default")
+
+    activity_text.config(state="disabled")
+
+
+
+
 
 def export_expenses():
     groups = expense_group_combo['values']
@@ -222,21 +306,21 @@ def export_expenses():
             writer.writerow([row[0], row[1], row[2] if row[2] else "", row[3], filter_group if filter_group else "All"])
     messagebox.showinfo("Export", f"Expenses exported successfully to:\n{file_path}")
 
-def view_monthly_summary():
-    cursor.execute("""
-        SELECT strftime('%Y-%m', date) as month, SUM(amount)
-        FROM expenses
-        WHERE user_email=?
-        GROUP BY month
-        ORDER BY month
-    """, (logged_in_email,))
-    data = cursor.fetchall()
-    if data:
-        summary_lines = [f"{month}: ${total:.2f}" for month, total in data]
-        summary_text = "\n".join(summary_lines)
-        messagebox.showinfo("Monthly Expenses Summary", summary_text)
-    else:
-        messagebox.showinfo("Summary", "No expenses to show.")
+#def view_monthly_summary():
+   # cursor.execute("""
+    #    SELECT strftime('%Y-%m', date) as month, SUM(amount)
+     #   FROM expenses
+      #  WHERE user_email=?
+       # GROUP BY month
+        #ORDER BY month
+   # """, (logged_in_email,))
+    #data = cursor.fetchall()
+   # if data:
+    #    summary_lines = [f"{month}: ${total:.2f}" for month, total in data]
+     #   summary_text = "\n".join(summary_lines)
+      #  messagebox.showinfo("Monthly Expenses Summary", summary_text)
+   # else:
+   #     messagebox.showinfo("Summary", "No expenses to show.")
 
 def show_expense_history():
     history_text.delete(1.0, tk.END)
@@ -264,6 +348,10 @@ def add_group():
         cursor.execute("INSERT INTO groups (group_name, owner_email) VALUES (?, ?)", (name, logged_in_email))
         group_id = cursor.lastrowid
         cursor.execute("INSERT INTO group_members (group_id, member_email) VALUES (?, ?)", (group_id, logged_in_email))
+        
+        cursor.execute("INSERT INTO activities (user_email, activity) VALUES (?, ?)",
+               (logged_in_email, f"Created group '{name}'"))
+
         conn.commit()
         messagebox.showinfo("Success", "Group created and you have been added.")
         group_name_entry.delete(0, tk.END)
@@ -271,6 +359,8 @@ def add_group():
         update_groups_in_expense_combo()
     else:
         messagebox.showerror("Error", "Please enter a group name.")
+
+
 
 def add_member_to_group():
     try:
@@ -291,14 +381,24 @@ def add_member_to_group():
                 messagebox.showinfo("Info", f"{new_member} is already a member of {group}.")
                 return
             cursor.execute("INSERT INTO group_members (group_id, member_email) VALUES (?, ?)", (gid[0], new_member))
+
+            # INSERT ACTIVITY LOG
+            cursor.execute("INSERT INTO activities (user_email, activity) VALUES (?, ?)",
+                           (logged_in_email, f"Added member '{new_member}' to group '{group}'"))
+
             conn.commit()
+
             messagebox.showinfo("Success", f"{new_member} added to {group}.")
             member_email_entry.delete(0, tk.END)
             update_groups_in_expense_combo()
+
+            #  REFRESH ACTIVITY FEED
+            update_activity_feed()
         else:
             messagebox.showerror("Error", "Group not found or you are not the owner.")
     except Exception as e:
         messagebox.showerror("Error", str(e))
+
 
 def view_groups():
     group_list.delete(0, tk.END)
@@ -311,6 +411,12 @@ def view_groups():
         group_list.insert(tk.END, row[0])
     show_frame(group_frame)
 
+# Function to update the recent activity feed
+def log_activity(msg):
+    activity_text.config(state="normal")
+    activity_text.insert("end", f"• {msg}\n")
+    activity_text.see("end")  
+    activity_text.config(state="disabled")
 
 
 
@@ -375,6 +481,11 @@ def view_group_members():
     info_text = f"Group '{group_name}' financials:\n\n" + "\n".join(lines)
     messagebox.showinfo(f"Group Members & Balances - {group_name}", info_text)
 
+
+
+
+    
+
 # --- Expense Split UI additions ---
 split_type_var = tk.StringVar(value="equal")  # default split type
 
@@ -426,17 +537,28 @@ def update_groups_in_expense_combo():
         expense_group_combo.set("")
         toggle_custom_split()
 
+
+expense_category_var = tk.StringVar(value="Select")
 def add_expense():
     try:
         amount = float(expense_amount.get())
         desc = expense_desc.get()
+
+
+        category = expense_category_var.get()
+
+
+
         group_name = expense_group_combo.get()
         if not group_name:
             messagebox.showerror("Error", "Please select a group.")
             return
 
-        cursor.execute("INSERT INTO expenses (user_email, amount, description) VALUES (?, ?, ?)",
-                       (logged_in_email, amount, desc))
+        cursor.execute("INSERT INTO expenses (user_email, amount, description, category) VALUES (?, ?, ?, ?)",
+        (logged_in_email, amount, desc, category_var.get())
+)
+        
+        
         expense_id = cursor.lastrowid
 
         cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (group_name, logged_in_email))
@@ -491,16 +613,30 @@ def add_expense():
 
         cursor.execute("INSERT INTO activities (user_email, activity) VALUES (?, ?)",
                        (logged_in_email, f"Added expense: ${amount:.2f} - {desc} in group '{group_name}' split {split_type}"))
+        
+        # Update balances   
         conn.commit()
-
+        
         messagebox.showinfo("Success", "Expense recorded with split.")
         expense_amount.delete(0, tk.END)
         expense_desc.delete(0, tk.END)
         toggle_custom_split()
         update_activity_feed()
 
+
+        
+
     except ValueError:
         messagebox.showerror("Error", "Invalid amount")
+
+def show_frame(frame):
+    frame.tkraise()
+
+
+def clear_frame(frame):
+    for widget in frame.winfo_children():
+        widget.destroy()
+
 
 #View Balance
 def update_balances_view():
@@ -696,38 +832,90 @@ reg_confirm.pack()
 tk.Button(register_frame, text="Register", command=register_user).pack(pady=10)
 tk.Button(register_frame, text="Back to Login", command=lambda: show_frame(login_frame)).pack()
 
+
+
 # --- Dashboard Frame UI ---
-dashboard_greeting = tk.Label(dashboard_frame, text="👋 Welcome!", font=("Arial", 18, "bold"), fg="#00796b", bg="#6babc3")
-dashboard_greeting.pack(pady=10)
 
-# Activity Feed
-activity_label = tk.Label(dashboard_frame, text="📜 Recent Activity", font=("Arial", 12, "bold"), bg="#6babc3", fg="black")
-activity_label.pack(anchor="w", padx=10)
-activity_text = tk.Text(dashboard_frame, height=8, width=45)
-activity_text.pack(pady=5)
+# Top welcome greeting
+dashboard_greeting = tk.Label(dashboard_frame, text="👋 Welcome!", font=("Arial", 18, "bold"), fg="#000000", bg="#6babc3")
+dashboard_greeting.pack(fill="x", pady=10)
 
-# Seperate
-ttk.Separator(dashboard_frame, orient='horizontal').pack(fill='x', pady=10)
+# Main horizontal layout
+main_body = tk.Frame(dashboard_frame, bg="#e0f7fa")
+main_body.pack(fill="both", expand=True)
 
-# action
-action_section = tk.Frame(dashboard_frame, bg="#42d2d0", padx=10, pady=10)
-action_section.pack(pady=5, fill="x")
+# Left side: Quick Actions panel
+action_section = tk.Frame(main_body, bg="#42d2d0", width=200, padx=10, pady=10)
+action_section.pack(side="left", fill="y", padx=10, pady=10)
 
-tk.Label(action_section, text="🔧 Quick Actions", font=("Arial", 12, "bold"), bg="#42d2d0", fg="black").pack(anchor="w")
+tk.Label(action_section, text="🔧 Quick Actions", font=("Arial", 12, "bold"), bg="#42d2d0", fg="black").pack(anchor="w", pady=(0, 10))
 
 tk.Button(action_section, text="👥 Manage Groups", font=("Arial", 11), command=view_groups).pack(fill="x", pady=2)
-tk.Button(action_section, text="➕ Add Expense", font=("Arial", 11, "bold"),
+tk.Button(action_section, text="➕ Add Expense", font=("Arial", 11),
           command=lambda: [update_groups_in_expense_combo(), show_frame(expense_frame)]).pack(fill="x", pady=2)
-tk.Button(action_section, text="💾 Export Expenses (CSV)", font=("Arial", 11), command=export_expenses).pack(fill="x", pady=2)
-tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11), command=view_monthly_summary).pack(fill="x", pady=2)
-tk.Button(action_section, text="⚙️ Settings", font=("Arial", 11), command=open_settings).pack(fill="x", pady=2)
-tk.Button(action_section, text="📜 View Expense History", font=("Arial", 11), command=show_expense_history).pack(fill="x", pady=2)
 tk.Button(action_section, text="📋 View Balances", font=("Arial", 11), command=update_balances_view).pack(fill="x", pady=2)
+tk.Button(action_section, text="📜 View Expense History", font=("Arial", 11), command=show_expense_history).pack(fill="x", pady=2)
+tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11),
+          command=lambda: [clear_frame(monthly_summary_frame),
+                           show_frame(monthly_summary_frame),
+                           show_monthly_summary(monthly_summary_frame, cursor, logged_in_email, lambda: show_frame(dashboard_frame))]).pack(fill="x", pady=2)
 
 
-tk.Button(dashboard_frame, text="\u21AA Logout", command=logout_user).pack(side="bottom", fill="x", pady=10)
+#tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11), command=view_monthly_summary).pack(fill="x", pady=2)
+tk.Button(action_section, text="💾 Export Expenses (CSV)", font=("Arial", 11), command=export_expenses).pack(fill="x", pady=2)
+tk.Button(action_section, text="⚙️ Settings", font=("Arial", 11), command=open_settings).pack(fill="x", pady=2)
+
+tk.Button(action_section, text="\u21AA Logout", command=logout_user).pack(side="bottom", fill="x", pady=(20, 0))
 
 
+
+# Right side container: for activity 
+right_content = tk.Frame(main_body, bg="#f7f7f7")
+right_content.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+
+# : Recent Activity Feed -----------
+recent_activity_frame = tk.LabelFrame(right_content, text="📜 Recent Activity", font=("Arial", 12, "bold"),
+                                      bg="#b7ea90", fg="#333", padx=10, pady=5, height=200, labelanchor="nw")
+recent_activity_frame.pack(fill="x", padx=5, pady=(0, 10))
+
+activity_box = tk.Frame(recent_activity_frame, bg="#ffffff")
+activity_box.pack(fill="x")
+
+activity_scrollbar = tk.Scrollbar(activity_box)
+activity_scrollbar.pack(side="right", fill="y")
+
+activity_text = tk.Text(activity_box,
+                        height=6,
+                        width=60,
+                        wrap="word",
+                        bg="white",
+                        fg="#222",
+                        font=("Arial", 10),
+                        yscrollcommand=activity_scrollbar.set,
+                        relief="flat",
+                        padx=8, pady=8)
+# Add color + style tags for activity types
+activity_text.tag_configure("timestamp", foreground="#888", font=("Arial", 9, "italic"))
+activity_text.tag_configure("expense", foreground="#2e7d32", font=("Arial", 10,"italic"))
+activity_text.tag_configure("group", foreground="#0d47a1", font=("Arial", 10, "italic"))
+activity_text.tag_configure("member", foreground="#6a1b9a", font=("Arial", 10,"italic"))
+activity_text.tag_configure("default", foreground="black", font=("Arial", 10,"italic"))
+activity_text.tag_configure("section", foreground="#333", font=("Arial", 11, "bold"))
+
+
+activity_text.pack(side="left", fill="both", expand=True)
+activity_scrollbar.config(command=activity_text.yview)
+
+activity_text.insert("end", "No recent activity yet...")
+activity_text.config(state="disabled")
+
+# ----------- BOTTOM: Placeholder for future graphs/visuals -----------
+dashboard_widgets_frame = tk.Frame(right_content, bg="#f7f7f7")
+dashboard_widgets_frame.pack(fill="both", expand=True)
+
+placeholder = tk.Label(dashboard_widgets_frame, text="📊 Graphs & Summaries Coming Soon!", 
+                       font=("Arial", 12, "italic"), bg="#f7f7f7", fg="#888")
+placeholder.pack(pady=20)
 
 
 
@@ -739,9 +927,17 @@ tk.Label(expense_frame, text="Add Expense", font=("Arial", 16)).pack(pady=10)
 tk.Label(expense_frame, text="Amount").pack()
 expense_amount = tk.Entry(expense_frame)
 expense_amount.pack(pady=5)
+
 tk.Label(expense_frame, text="Description").pack()
 expense_desc = tk.Entry(expense_frame)
 expense_desc.pack(pady=5)
+
+tk.Label(expense_frame, text="Category:").pack()
+category_var = tk.StringVar()
+category_combo = ttk.Combobox(expense_frame, textvariable=category_var)
+category_combo['values'] = ("Groceries", "Utilities", "Travel", "Rent", "Other")
+category_combo.pack()
+
 
 tk.Label(expense_frame, text="Select Group").pack(pady=5)
 expense_group_combo = ttk.Combobox(expense_frame, state="readonly")

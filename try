@@ -1,0 +1,75 @@
+def add_expense():
+    try:
+        amount = float(expense_amount.get())
+        desc = expense_desc.get()
+        group_name = expense_group_combo.get()
+        if not group_name:
+            messagebox.showerror("Error", "Please select a group.")
+            return
+
+        cursor.execute("INSERT INTO expenses (user_email, amount, description) VALUES (?, ?, ?)",
+                       (logged_in_email, amount, desc))
+        expense_id = cursor.lastrowid
+
+        cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (group_name, logged_in_email))
+        gid = cursor.fetchone()
+        if not gid:
+            messagebox.showerror("Error", "Group not found or you are not the owner.")
+            return
+        gid = gid[0]
+
+        cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid,))
+        members = [row[0] for row in cursor.fetchall()]
+        if not members:
+            messagebox.showerror("Error", "No members in selected group.")
+            return
+
+        split_type = split_type_var.get()
+
+        if split_type == "equal":
+            split_amount = round(amount / len(members), 2)
+            total_assigned = split_amount * (len(members) - 1)
+            last_amount = round(amount - total_assigned, 2)
+            for i, member in enumerate(members):
+                amt = split_amount if i < len(members) - 1 else last_amount
+                cursor.execute("INSERT INTO expense_splits (expense_id, member_email, amount) VALUES (?, ?, ?)",
+                               (expense_id, member, amt))
+
+        elif split_type == "custom":
+            total_entered = 0
+            for member in members:
+                ent = custom_entries.get(member)
+                if not ent:
+                    messagebox.showerror("Error", "Missing custom amounts.")
+                    return
+                try:
+                    val = float(ent.get())
+                except:
+                    messagebox.showerror("Error", f"Invalid amount for {member}")
+                    return
+                total_entered += val
+
+            if round(total_entered, 2) != round(amount, 2):
+                messagebox.showerror("Error", f"Custom split amounts (${total_entered:.2f}) do not sum to total amount (${amount:.2f})")
+                return
+
+            for member in members:
+                val = float(custom_entries[member].get())
+                cursor.execute("INSERT INTO expense_splits (expense_id, member_email, amount) VALUES (?, ?, ?)",
+                               (expense_id, member, val))
+        else:
+            messagebox.showerror("Error", "Invalid split type selected.")
+            return
+
+        cursor.execute("INSERT INTO activities (user_email, activity) VALUES (?, ?)",
+                       (logged_in_email, f"Added expense: ${amount:.2f} - {desc} in group '{group_name}' split {split_type}"))
+        conn.commit()
+        
+        messagebox.showinfo("Success", "Expense recorded with split.")
+        expense_amount.delete(0, tk.END)
+        expense_desc.delete(0, tk.END)
+        toggle_custom_split()
+        update_activity_feed()
+
+        except ValueError:
+        messagebox.showerror("Error", "Invalid amount")
