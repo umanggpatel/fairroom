@@ -319,21 +319,7 @@ def export_expenses():
             writer.writerow([row[0], row[1], row[2] if row[2] else "", row[3], filter_group if filter_group else "All"])
     messagebox.showinfo("Export", f"Expenses exported successfully to:\n{file_path}")
 
-#def view_monthly_summary():
-   # cursor.execute("""
-    #    SELECT strftime('%Y-%m', date) as month, SUM(amount)
-     #   FROM expenses
-      #  WHERE user_email=?
-       # GROUP BY month
-        #ORDER BY month
-   # """, (logged_in_email,))
-    #data = cursor.fetchall()
-   # if data:
-    #    summary_lines = [f"{month}: ${total:.2f}" for month, total in data]
-     #   summary_text = "\n".join(summary_lines)
-      #  messagebox.showinfo("Monthly Expenses Summary", summary_text)
-   # else:
-   #     messagebox.showinfo("Summary", "No expenses to show.")
+
 
 def show_expense_history():
     history_text.delete(1.0, tk.END)
@@ -679,16 +665,7 @@ def update_balances_view():
 
 
 
-    # Format the balances in a string
-   # balances_text = ""
-    #for row in rows:
-        #full_name = f"{row[0]} {row[1]}"
-     #   balance = f"₹{row[2]:.2f}"
-        #balances_text += f"{full_name}: {balance}\n"
-
-   # messagebox.showinfo("User Balances", balances_text)
-
-# === Settings additions ===
+# Settings additions 
 
 notif_var = tk.IntVar()
 
@@ -984,7 +961,7 @@ expense_desc.pack(pady=5)
 tk.Label(expense_frame, text="Category:").pack()
 category_var = tk.StringVar()
 category_combo = ttk.Combobox(expense_frame, textvariable=category_var)
-category_combo['values'] = ("Groceries", "Utilities", "Travel", "Rent", "Other")
+category_combo['values'] = ("Groceries", "Utilities", "Travel", "Rent", "Dining Out","Medical","Entertainment" , "Other")
 category_combo.pack()
 
 
@@ -995,7 +972,7 @@ expense_group_combo.pack(pady=5)
 tk.Label(expense_frame, text="Split Type").pack(pady=5)
 split_equal_rb = tk.Radiobutton(expense_frame, text="Equal Split", variable=split_type_var, value="equal", command=toggle_custom_split)
 split_equal_rb.pack()
-split_custom_rb = tk.Radiobutton(expense_frame, text="Custom Split", variable=split_type_var, value="custom", command=toggle_custom_split)
+split_custom_rb = tk.Radiobutton(expense_frame, text="Customize Split", variable=split_type_var, value="custom", command=toggle_custom_split)
 split_custom_rb.pack()
 
 custom_split_frame.pack_forget()
