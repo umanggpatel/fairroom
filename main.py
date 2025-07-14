@@ -185,17 +185,30 @@ def register_user():
     fname = reg_fname.get().strip()
     lname = reg_lname.get().strip()
     email = reg_email.get().strip().lower()
-    password = hash_password(reg_password.get().strip())
-    if not fname or not lname or not email or not password:
-        messagebox.showerror("Error", "Please fill all fields.")
+    password = reg_password.get().strip()
+    confirm = reg_confirm.get().strip()
+
+    if not fname or not lname or not email or not password or not confirm:
+        messagebox.showerror("Error", "Please fill in all fields.")
         return
+
+    if password != confirm:
+        messagebox.showerror("Error", "Passwords do not match.")
+        return
+
+    hashed_password = hash_password(password)
+
     try:
-        cursor.execute("INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)",
-                       (fname, lname, email, password))
+        cursor.execute(
+            "INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)",
+            (fname, lname, email, hashed_password)
+        )
         conn.commit()
-        messagebox.showinfo("Success", "Registered successfully!")
+        messagebox.showinfo("Success", "Registration successful! You can now log in.")
+        show_frame(login_frame)
     except sqlite3.IntegrityError:
-        messagebox.showerror("Error", "Email already exists.")
+        messagebox.showerror("Error", "An account with this email already exists.")
+
 
 #def update_activity_feed():
    # activity_text.delete(1.0, tk.END)
@@ -806,32 +819,68 @@ tk.Button(login_box,text="Login",command=login_user,font=("Arial", 11, "bold"),b
 tk.Label(login_box, text="Don't have an account?", bg="#fefae0",fg="black").pack()
 tk.Button(login_box, text="🙋‍♂️ Register Here", command=lambda: show_frame(register_frame)).pack()
 
+
+
+
+from tkinter import messagebox  # Make sure this is imported
+
 # --- Registration Frame ---
-tk.Label(register_frame, text="Register", font=("Arial", 18)).pack(pady=10)
+register_frame.configure(bg="#d0e7f9")  # Light blue background
 
-tk.Label(register_frame, text="First Name").pack()
-reg_fname = tk.Entry(register_frame)
-reg_fname.pack()
+# Centered white registration box
+register_box = tk.Frame(register_frame, bg="white", bd=2, relief="ridge", padx=25, pady=25)
+register_box.place(relx=0.5, rely=0.5, anchor="center")  # Center on screen
 
-tk.Label(register_frame, text="Last Name").pack()
-reg_lname = tk.Entry(register_frame)
-reg_lname.pack()
+tk.Label(register_box, text="📝 Register", font=("Arial", 20, "bold"), fg="#222", bg="white").pack(pady=(0, 20))
 
-tk.Label(register_frame, text="Email").pack()
-reg_email = tk.Entry(register_frame)
-reg_email.pack()
+# Input: First Name
+tk.Label(register_box, text="First Name", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
+reg_fname = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_fname.pack(fill="x", ipady=4, pady=(0, 10))
 
-tk.Label(register_frame, text="Password").pack()
-reg_password = tk.Entry(register_frame, show="*")
-reg_password.pack()
+# Input: Last Name
+tk.Label(register_box, text="Last Name", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
+reg_lname = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_lname.pack(fill="x", ipady=4, pady=(0, 10))
 
-tk.Label(register_frame, text="Confirm Password").pack()
-reg_confirm = tk.Entry(register_frame, show="*")
-reg_confirm.pack()
+# Input: Email
+tk.Label(register_box, text="📧 Email", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
+reg_email = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_email.pack(fill="x", ipady=4, pady=(0, 10))
 
-tk.Button(register_frame, text="Register", command=register_user).pack(pady=10)
-tk.Button(register_frame, text="Back to Login", command=lambda: show_frame(login_frame)).pack()
+# Input: Password
+tk.Label(register_box, text="🔒 Password", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
+reg_password = tk.Entry(register_box, show="*", font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_password.pack(fill="x", ipady=4, pady=(0, 10))
 
+# Input: Confirm Password
+tk.Label(register_box, text="🔒 Confirm Password", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
+reg_confirm = tk.Entry(register_box, show="*", font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_confirm.pack(fill="x", ipady=4, pady=(0, 5))
+
+# Real-time match label
+match_label = tk.Label(register_box, text="", font=("Arial", 10, "italic"), bg="white")
+match_label.pack()
+
+def check_password_match(event=None):
+    if reg_password.get() and reg_confirm.get():
+        if reg_password.get() == reg_confirm.get():
+            match_label.config(text="✅ Passwords match", fg="green")
+        else:
+            match_label.config(text="❌ Passwords do not match", fg="red")
+    else:
+        match_label.config(text="")
+
+reg_password.bind("<KeyRelease>", check_password_match)
+reg_confirm.bind("<KeyRelease>", check_password_match)
+
+# Register Button
+tk.Button(register_box, text="✅ Register", command=lambda: register_user(),
+          font=("Arial", 11, "bold"), bg="#4CAF50", fg="black", relief="raised").pack(fill="x", pady=(10, 5))
+
+# Back Button
+tk.Button(register_box, text="🔙 Back to Login", command=lambda: show_frame(login_frame),
+          font=("Arial", 10), bg="#e0e0e0", relief="raised").pack(fill="x")
 
 
 # --- Dashboard Frame UI ---
