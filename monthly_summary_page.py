@@ -3,6 +3,7 @@ from tkinter import ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 from datetime import datetime
+import matplotlib.ticker as mtick
 
 def show_monthly_summary(frame, cursor, logged_in_email, show_dashboard_callback):
     # Clear the frame first
@@ -82,7 +83,7 @@ def show_monthly_summary(frame, cursor, logged_in_email, show_dashboard_callback
         height = bar.get_height()
         ax.text(
             bar.get_x() + bar.get_width() / 2,
-            height + 5,
+            height + (height * 0.001),
             f"${int(amount):,}",
             ha='center',
             va='bottom',
@@ -92,10 +93,10 @@ def show_monthly_summary(frame, cursor, logged_in_email, show_dashboard_callback
 
     # Customize X-axis
     ax.set_xlabel("Month", fontsize=10)
-    ax.set_ylabel("")  # Remove Y-axis label
+    ax.set_ylabel("Total Amount($)", fontsize=10)  
     ax.set_title("Monthly Expense Overview", fontsize=13)
     ax.tick_params(axis='x', rotation=0)
-
+    ax.yaxis.set_major_formatter(mtick.FuncFormatter(lambda x, _: f"${int(x):,}"))
     # Embed chart into Tkinter
     chart = FigureCanvasTkAgg(fig, master=scrollable_frame)
     chart.draw()
