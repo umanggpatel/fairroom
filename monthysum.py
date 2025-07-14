@@ -1,12 +1,14 @@
+from datetime import datetime
 def get_monthly_expenses(cursor, logged_in_email):
     cursor.execute("""
         SELECT strftime('%Y-%m', date) as month, SUM(amount)
         FROM expenses
         WHERE user_email=?
         GROUP BY month
-        ORDER BY month
+        ORDER BY month ASC
     """, (logged_in_email,))
-    return cursor.fetchall()
+    data= cursor.fetchall()
+    return [(datetime.strptime(month, "%Y-%m"), total) for month, total in data]
 
 
 def get_total_spent_this_month(cursor, logged_in_email):
@@ -37,5 +39,6 @@ def get_group_expense_breakdown(cursor, logged_in_email):
         JOIN groups g ON e.group_id = g.id
         WHERE e.user_email=?
         GROUP BY g.group_name
+        ORDER BY SUM(e.amount) DESC
     """, (logged_in_email,))
     return cursor.fetchall()
