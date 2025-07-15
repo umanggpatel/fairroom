@@ -7,6 +7,7 @@ import csv
 from datetime import datetime, timedelta
 from monthly_summary_page import show_monthly_summary
 from tkcalendar import DateEntry
+import re
 
 
 
@@ -157,11 +158,20 @@ def get_remember_email():
             return f.read().strip()
     return ""
 
-# Login and Registration
+
+
+def valid_email(email):
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    return re.match(pattern, email) is not None
+
+# Validation, Login and Registration
 def login_user():
     global logged_in_email
     email = login_email.get().strip().lower()
     password = hash_password(login_password.get().strip())
+    if not valid_email(email):
+        messagebox.showerror("Invalid Email", "Please enter a valid email address (e.g., youremail@gmail.com).")
+        return
     cursor.execute("SELECT * FROM users WHERE email=? AND password=? AND active=1", (email, password))
     user = cursor.fetchone()
     if user:
@@ -190,6 +200,10 @@ def register_user():
 
     if not fname or not lname or not email or not password or not confirm:
         messagebox.showerror("Error", "Please fill in all fields.")
+        return
+    
+    if not valid_email(email):
+        messagebox.showerror("Invalid Email", "Please enter a valid email address (e.g., youremail@gmail.com).")
         return
 
     if password != confirm:
