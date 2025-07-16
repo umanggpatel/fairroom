@@ -164,6 +164,20 @@ def valid_email(email):
     pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     return re.match(pattern, email) is not None
 
+
+def strong_password(password):
+    if len(password)<8:
+        return False
+    if not re.search(r"[A-Z]", password):
+        return False
+    if not re.search(r"[a-z]", password): 
+        return False
+    if not re.search(r"\d", password):
+        return False
+    return True
+    
+    
+
 # Validation, Login and Registration
 def login_user():
     global logged_in_email
@@ -209,6 +223,11 @@ def register_user():
     if password != confirm:
         messagebox.showerror("Error", "Passwords do not match.")
         return
+    if not strong_password(password):
+        messagebox.showerror(
+        "Weak Password",
+    "Password must be at least 8 characters long and include:\n• At least one uppercase letter\n• At least one lowercase letter\n• At least one number or special character")
+        return 
 
     hashed_password = hash_password(password)
 
