@@ -38,7 +38,7 @@ cursor.execute("""
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_email TEXT NOT NULL,
         activity TEXT NOT NULL,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        timestamp DATETIME 
     )
 """)
 cursor.execute("""
@@ -380,9 +380,15 @@ def add_group():
         cursor.execute("INSERT INTO groups (group_name, owner_email) VALUES (?, ?)", (name, logged_in_email))
         group_id = cursor.lastrowid
         cursor.execute("INSERT INTO group_members (group_id, member_email) VALUES (?, ?)", (group_id, logged_in_email))
+
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO activities (user_email, activity, timestamp)
+            VALUES (?, ?, ?)
+        """, (logged_in_email, f"Created group '{name}'", timestamp))
+
         
-        cursor.execute("INSERT INTO activities (user_email, activity) VALUES (?, ?)",
-               (logged_in_email, f"Created group '{name}'"))
+  
 
         conn.commit()
         messagebox.showinfo("Success", "Group created and you have been added.")
@@ -415,9 +421,11 @@ def add_member_to_group():
             cursor.execute("INSERT INTO group_members (group_id, member_email) VALUES (?, ?)", (gid[0], new_member))
 
             # INSERT ACTIVITY LOG
-            cursor.execute("INSERT INTO activities (user_email, activity) VALUES (?, ?)",
-                           (logged_in_email, f"Added member '{new_member}' to group '{group}'"))
-
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute("""
+                INSERT INTO activities (user_email, activity, timestamp)
+                VALUES (?, ?, ?)
+            """, (logged_in_email, f"Added member '{new_member}' to group '{group}'", timestamp))
             conn.commit()
 
             messagebox.showinfo("Success", f"{new_member} added to {group}.")
@@ -643,8 +651,9 @@ def add_expense():
             messagebox.showerror("Error", "Invalid split type selected.")
             return
 
-        cursor.execute("INSERT INTO activities (user_email, activity) VALUES (?, ?)",
-                       (logged_in_email, f"Added expense: ${amount:.2f} - {desc} in group '{group_name}' split {split_type}"))
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""INSERT INTO activities (user_email, activity, timestamp) VALUES (?, ?, ?)""",(logged_in_email, f"Added expense: ${amount:.2f} - {desc} in group '{group_name}' split {split_type}", timestamp))
+
         
         # Update balances   
         conn.commit()
