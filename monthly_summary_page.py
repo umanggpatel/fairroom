@@ -6,53 +6,35 @@ from datetime import datetime
 import matplotlib.ticker as mtick
 
 def show_monthly_summary(frame, cursor, logged_in_email, show_dashboard_callback):
-    # Clear the frame first
+    # Clear the frame
     for widget in frame.winfo_children():
         widget.destroy()
 
-    # Top header row with Back button and Title
+    # Header Frame
     header_frame = tk.Frame(frame, bg="white")
     header_frame.pack(fill="x", pady=10, padx=10)
 
-    back_button = tk.Button(
-        header_frame,
-        text="⬅ Back to DB",
-        font=("Arial", 10, "bold"),
-        bg="#e0e0e0",
-        fg="black",
-        relief="raised",
-        command=show_dashboard_callback
-    )
-    back_button.pack(side="left")
+    tk.Button(
+        header_frame, text="⬅ Back to DB", font=("Arial", 10, "bold"),
+        bg="#e0e0e0", fg="black", relief="raised", command=show_dashboard_callback
+    ).pack(side="left")
 
-    title_label = tk.Label(
-        frame,
-        text="📊 Monthly Summary",
-        font=("Arial", 16, "bold"),
-        bg="white",
-        fg="#333"
-    )
-    title_label.pack(pady=10, anchor="n")
+    tk.Label(
+        frame, text="📊 Monthly Summary", font=("Arial", 16, "bold"),
+        bg="white", fg="#333"
+    ).pack(pady=10, anchor="n")
 
-    # Scrollable area setup
+    # Scrollable Area
     canvas = tk.Canvas(frame, bg="white")
     scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
     scrollable_frame = tk.Frame(canvas, bg="white")
-
-    scrollable_frame.bind(
-        "<Configure>",
-        lambda e: canvas.configure(
-            scrollregion=canvas.bbox("all")
-        )
-    )
-
+    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
     canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
     canvas.configure(yscrollcommand=scrollbar.set)
-
     canvas.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    # Query monthly totals
+    # ========== Monthly Bar Chart ==========
     cursor.execute("""
         SELECT strftime('%Y-%m', date) as month, SUM(amount)
         FROM expenses
@@ -66,38 +48,69 @@ def show_monthly_summary(frame, cursor, logged_in_email, show_dashboard_callback
         tk.Label(scrollable_frame, text="No data available.", bg="white", fg="gray").pack(pady=20)
         return
 
-    # Convert YYYY-MM to month abbreviation like "Jul"
     months = [datetime.strptime(row[0], "%Y-%m").strftime("%B %Y") for row in data]
     totals = [row[1] for row in data]
 
-    # Plot bar chart
-    fig, ax = plt.subplots(figsize=(8, 4), dpi=100)
-    bars = ax.bar(months, totals, color="#119764")
-
-    # Hide Y-axis ticks and left spine
-    ax.yaxis.set_ticks([])
-    ax.spines['left'].set_visible(False)
-
-    # Add value labels on top of bars
+    fig1, ax1 = plt.subplots(figsize=(7, 4), dpi=100)
+    bars = ax1.bar(months, totals, color="#119764")
+    ax1.set_xlabel("Month", fontsize=10)
+    ax1.set_ylabel("Total Amount($)", fontsize=10)
+    ax1.set_title("Monthly Expense Overview", fontsize=13)
+    ax1.tick_params(axis='x', rotation=0)
+    ax1.yaxis.set_major_formatter(mtick.FuncFormatter(lambda x, _: f"${int(x):,}"))
     for bar, amount in zip(bars, totals):
-        height = bar.get_height()
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            height + (height * 0.001),
-            f"${int(amount):,}",
-            ha='center',
-            va='bottom',
-            fontsize=9,
-            fontweight='bold'
-        )
+        ax1.text(bar.get_x() + bar.get_width() / 2, amount, f"${int(amount):,}", ha='center', va='bottom', fontsize=9)
 
-    # Customize X-axis
-    ax.set_xlabel("Month", fontsize=10)
-    ax.set_ylabel("Total Amount($)", fontsize=10)  
-    ax.set_title("Monthly Expense Overview", fontsize=13)
-    ax.tick_params(axis='x', rotation=0)
-    ax.yaxis.set_major_formatter(mtick.FuncFormatter(lambda x, _: f"${int(x):,}"))
-    # Embed chart into Tkinter
-    chart = FigureCanvasTkAgg(fig, master=scrollable_frame)
-    chart.draw()
-    chart.get_tk_widget().pack(pady=10, padx=20, fill="both", expand=True)
+    canvas1 = FigureCanvasTkAgg(fig1, master=scrollable_frame)
+    canvas1.draw()
+    canvas1.get_tk_widget().pack(pady=10)
+
+    # ========== Side-by-side Charts Frame ==========
+    dual_frame = tk.Frame(scrollable_frame, bg="white")
+    dual_frame.pack(fill="x", padx=20)
+
+    # ========== Pie Chart (Left) ==========
+    cursor.execute("""
+        SELECT category, SUM(amount)
+        FROM expenses
+        WHERE user_email=?
+        GROUP BY category
+    """, (logged_in_email,))
+    cat_data = cursor.fetchall()
+
+    categories = [row[0] for row in cat_data]
+    cat_totals = [row[1] for row in cat_data]
+
+    fig2, ax2 = plt.subplots(figsize=(4.5, 4), dpi=100)
+    ax2.pie(cat_totals, labels=categories, autopct='%1.1f%%', startangle=140)
+    ax2.set_title("Category-wise Expense Distribution")
+
+    canvas2 = FigureCanvasTkAgg(fig2, master=dual_frame)
+    canvas2.draw()
+    canvas2.get_tk_widget().pack(side="left", padx=10)
+
+# Get all users who owe the logged-in user money (i.e., to_user = you)
+    cursor.execute("""
+        SELECT from_user, SUM(amount)
+        FROM balances
+        WHERE to_user=?
+        GROUP BY from_user
+    """, (logged_in_email,))
+    owe_data = cursor.fetchall()
+
+
+    parties = [row[0] for row in owe_data]
+    amounts = [row[1] for row in owe_data]
+
+    fig3, ax3 = plt.subplots(figsize=(4.5, 4), dpi=100)
+    bars2 = ax3.barh(parties, amounts, color="#d9534f")
+    ax3.set_xlabel("Amount ($)")
+    ax3.set_title("You Owe (per Person)")
+
+    for bar, amount in zip(bars2, amounts):
+        ax3.text(amount + 0.1, bar.get_y() + bar.get_height() / 2, f"${amount:.2f}", va='center', fontsize=9)
+
+    canvas3 = FigureCanvasTkAgg(fig3, master=dual_frame)
+    canvas3.draw()
+    canvas3.get_tk_widget().pack(side="left", padx=10)
+
