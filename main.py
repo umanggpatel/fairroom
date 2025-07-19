@@ -74,6 +74,7 @@ cursor.execute("""
     )
 """)
 
+
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS balances (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -678,9 +679,9 @@ def clear_frame(frame):
     for widget in frame.winfo_children():
         widget.destroy()
 
-
+'''
 #View Balance
-def update_balances_view():
+/*def update_balances_view():
     global view_balances_frame, balances_list
 
     view_balances_frame = tk.Frame(root, bg="#f0f0f0")
@@ -704,8 +705,7 @@ def update_balances_view():
 
     show_frame(view_balances_frame)
 
-
-
+'''
 
 # Settings additions 
 
@@ -921,7 +921,7 @@ tk.Label(action_section, text="🔧 Quick Actions", font=("Arial", 12, "bold"), 
 tk.Button(action_section, text="👥 Manage Groups", font=("Arial", 11), command=view_groups).pack(fill="x", pady=2)
 tk.Button(action_section, text="➕ Add Expense", font=("Arial", 11),
           command=lambda: [update_groups_in_expense_combo(), show_frame(expense_frame)]).pack(fill="x", pady=2)
-tk.Button(action_section, text="📋 View Balances", font=("Arial", 11), command=update_balances_view).pack(fill="x", pady=2)
+#tk.Button(action_section, text="📋 View Balances", font=("Arial", 11), command=update_balances_view).pack(fill="x", pady=2)
 tk.Button(action_section, text="📜 View Expense History", font=("Arial", 11), command=show_expense_history).pack(fill="x", pady=2)
 tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11),
           command=lambda: [clear_frame(monthly_summary_frame),
