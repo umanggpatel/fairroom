@@ -78,12 +78,14 @@ cursor.execute("""
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS balances (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_email TEXT NOT NULL,
-        other_party TEXT NOT NULL,
+        from_user TEXT NOT NULL,    
+        to_user TEXT NOT NULL,      
         amount REAL NOT NULL,
-        type TEXT CHECK(type IN ('owes_you', 'you_owe')) NOT NULL
-    )
+        group_id INTEGER
+    );
 """)
+
+
 
 try:
     cursor.execute("ALTER TABLE expenses ADD COLUMN category TEXT")
@@ -489,42 +491,33 @@ def view_group_members():
     if not selection:
         messagebox.showerror("Error", "Please select a group from the list.")
         return
+
     group_name = group_list.get(selection[0])
-    
-    cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (group_name, logged_in_email))
-    gid_res = cursor.fetchone()
-    if not gid_res:
-        messagebox.showerror("Error", "Group not found or you are not the owner.")
+    cursor.execute("SELECT id FROM groups WHERE group_name=?", (group_name,))
+    result = cursor.fetchone()
+    if not result:
+        messagebox.showerror("Error", "Group not found.")
         return
-    gid = gid_res[0]
-    
-    cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid,))
-    members = [row[0] for row in cursor.fetchall()]
-    if not members:
-        messagebox.showinfo("Group Members", "No members in this group.")
-        return
-    
-    lines = []
-    for member in members:
-        cursor.execute("SELECT IFNULL(SUM(amount),0) FROM expenses WHERE user_email=?", (member,))
-        total_paid = cursor.fetchone()[0]
 
-        cursor.execute("""
-            SELECT IFNULL(SUM(amount),0) FROM expense_splits
-            WHERE member_email=? AND expense_id IN (
-                SELECT id FROM expenses WHERE user_email IN (
-                    SELECT member_email FROM group_members WHERE group_id=?
-                )
-            )
-        """, (member, gid))
-        total_owed = cursor.fetchone()[0]
+    gid = result[0]
 
-        net_balance = total_paid - total_owed
-        lines.append(f"{member}\n  Paid: ${total_paid:.2f}\n  Owes: ${total_owed:.2f}\n  Net: ${net_balance:.2f}\n")
+    # ✅ Show clean 'who owes whom' instead of summary
+    cursor.execute("""
+        SELECT from_user, to_user, SUM(amount)
+        FROM balances
+        WHERE group_id = ?
+        GROUP BY from_user, to_user
+    """, (gid,))
+    rows = cursor.fetchall()
 
-    info_text = f"Group '{group_name}' financials:\n\n" + "\n".join(lines)
-    messagebox.showinfo(f"Group Members & Balances - {group_name}", info_text)
+    if not rows:
+        message = "No balances found."
+    else:
+        message = ""
+        for from_user, to_user, amt in rows:
+            message += f"{from_user} owes {to_user}: ${amt:.2f}\n"
 
+    messagebox.showinfo(f"Group '{group_name}' balances", message)
 
 
 
@@ -657,10 +650,17 @@ def add_expense():
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""INSERT INTO activities (user_email, activity, timestamp) VALUES (?, ?, ?)""",(logged_in_email, f"Added expense: ${amount:.2f} - {desc} in group '{group_name}' split {split_type}", timestamp))
-
-        
+        insert_balance(
+    payer=logged_in_email,
+    split_with=members,
+    amount=amount,
+    group_id=gid
+)
         # Update balances   
         conn.commit()
+
+   
+
         
         messagebox.showinfo("Success", "Expense recorded with split.")
         expense_amount.delete(0, tk.END)
@@ -681,6 +681,72 @@ def show_frame(frame):
 def clear_frame(frame):
     for widget in frame.winfo_children():
         widget.destroy()
+def insert_balance(payer, split_with, amount, group_id):
+    total_people = len(split_with) + 1
+    split_amount = amount / total_people
+
+    for person in split_with:
+        if person != payer:
+            cursor.execute("""
+                INSERT INTO balances (from_user, to_user, amount, group_id)
+                VALUES (?, ?, ?, ?)
+            """, (person, payer, split_amount, group_id))
+
+    conn.commit()
+
+def show_group_balances(logged_in_email, group_id):
+    message = ""
+
+    # Get who you owe
+    cursor.execute("""
+        SELECT to_user, SUM(amount) FROM balances
+        WHERE from_user = ? AND group_id = ?
+        GROUP BY to_user
+    """, (logged_in_email, group_id))
+    owes_list = cursor.fetchall()
+
+    # Get who owes you
+    cursor.execute("""
+        SELECT from_user, SUM(amount) FROM balances
+        WHERE to_user = ? AND group_id = ?
+        GROUP BY from_user
+    """, (logged_in_email, group_id))
+    owed_list = cursor.fetchall()
+
+    if not owes_list and not owed_list:
+        message = "You have no balances in this group."
+    else:
+        if owes_list:
+            message += "🔻 You Owe:\n"
+            for to_user, amt in owes_list:
+                message += f"→ {to_user}: ${amt:.2f}\n"
+
+        if owed_list:
+            message += "\n🟢 Owes You:\n"
+            for from_user, amt in owed_list:
+                message += f"← {from_user}: ${amt:.2f}\n"
+
+    messagebox.showinfo(f"Group '{group_id}' balances", message)
+
+def show_clear_balances(group_id):
+    message = ""
+
+    # Show who owes whom in this group
+    cursor.execute("""
+        SELECT from_user, to_user, SUM(amount) as total
+        FROM balances
+        WHERE group_id = ?
+        GROUP BY from_user, to_user
+    """, (group_id,))
+    rows = cursor.fetchall()
+
+    if not rows:
+        message = "No balances found."
+    else:
+        for from_user, to_user, amt in rows:
+            message += f"{from_user} owes {to_user}: ${amt:.2f}\n"
+
+    messagebox.showinfo(f"Group '{group_id}' balances", message)
 
 '''
 #View Balance
@@ -1070,6 +1136,8 @@ if saved_email:
 
 show_frame(login_frame)
 root.mainloop()
+
+
 
 
 
