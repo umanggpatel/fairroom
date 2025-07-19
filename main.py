@@ -216,6 +216,9 @@ def register_user():
     if not fname or not lname or not email or not password or not confirm:
         messagebox.showerror("Error", "Please fill in all fields.")
         return
+    if not fname.isalpha() or not lname.isalpha():
+        messagebox.showerror("Invalid Name", "First Name and Last Name must contain only letters (no numbers or symbols).")
+        return
     
     if not valid_email(email):
         messagebox.showerror("Invalid Email", "Please enter a valid email address (e.g., youremail@gmail.com).")
