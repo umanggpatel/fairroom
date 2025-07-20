@@ -15,7 +15,7 @@ history_backup = ""
 
 
 
-
+current_group_id = None  # Stores selected group for settle_up
 # === Setup SQLite DB ===
 if not os.path.exists("users.db"):
     conn = sqlite3.connect("users.db")
@@ -1120,6 +1120,8 @@ tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11),
                            show_frame(monthly_summary_frame),
                            show_monthly_summary(monthly_summary_frame, cursor, logged_in_email, lambda: show_frame(dashboard_frame))]).pack(fill="x", pady=2)
 
+tk.Button(dashboard_frame, text="Settle Up Balances", bg="#ffcccc",
+          command=lambda: settle_up(current_group_id, logged_in_email, cursor, conn)).pack(pady=5)
 
 #tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11), command=view_monthly_summary).pack(fill="x", pady=2)
 tk.Button(action_section, text="💾 Export Expenses (CSV)", font=("Arial", 11), command=export_expenses).pack(fill="x", pady=2)
