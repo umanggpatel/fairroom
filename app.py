@@ -143,6 +143,22 @@ def launch_app():
     split_dropdown = ttk.Combobox(dashboard_frame, textvariable=split_var)
     split_dropdown['values'] = ["Equal", "Custom"]
     split_dropdown.grid(row=2, column=1)
+# Balance Reminder Toggle
+reminder_var = tk.BooleanVar()
+reminder_checkbox = tk.Checkbutton(
+    dashboard_frame,
+    text="Enable Balance Reminder Notification",
+    variable=reminder_var
+)
+reminder_checkbox.grid(row=8, column=0, columnspan=2)
+
+def check_reminder():
+    if reminder_var.get():
+        messagebox.showinfo("Reminder Enabled", "You will get balance notifications (feature coming soon).")
+    else:
+        messagebox.showinfo("Reminder Disabled", "Balance notifications are off.")
+
+tk.Button(dashboard_frame, text="Check Reminder Status", command=check_reminder).grid(row=9, column=0, columnspan=2)
 
     tk.Button(dashboard_frame, text="Add Expense", command=add_expense).grid(row=3, column=0, columnspan=2, pady=4)
     tk.Label(dashboard_frame, text="History").grid(row=4, column=0, columnspan=2)
