@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from monthly_summary_page import show_monthly_summary
 from tkcalendar import DateEntry
 import re
+history_backup = ""
+
 
 
 
@@ -119,7 +121,10 @@ style.configure("RoundedEntry.TEntry", relief="flat", padding=6, borderwidth=1, 
 root.grid_rowconfigure(0, weight=1)
 root.grid_columnconfigure(0, weight=1)
 
+#Global Variables
 logged_in_email = None
+history_backup = ""
+
 
 # === Frames ===
 login_frame = tk.Frame(root, bg="#6babc3")
@@ -361,7 +366,10 @@ def export_expenses():
 
 
 def show_expense_history():
+    #history_text.delete(1.0, tk.END)
+    history_text.config(state="normal")
     history_text.delete(1.0, tk.END)
+
     cursor.execute("""
         SELECT e.date, e.amount, e.description, g.group_name
         FROM expenses e
@@ -373,9 +381,20 @@ def show_expense_history():
     if not rows:
         history_text.insert(tk.END, "No expenses to show.\n")
         return
+    for idx, (date, amount, desc, group) in enumerate(rows, 1):
+        history_text.insert("end", f"🔹 Entry #{idx}\n", "entry")
+        history_text.insert("end", f"📅 Date: {date}\n", "label")
+        history_text.insert("end", f"💰 Amount: ${amount:.2f}\n", "amount")
+        history_text.insert("end", f"📝 Description: {desc or 'No description'}\n", "label")
+        history_text.insert("end", f"👥 Group: {group or 'N/A'}\n", "label")
+        history_text.insert("end", "-"*40 + "\n", "divider")
+        history_text.tag_configure("entry", font=("Arial", 11, "bold"), foreground="#1a237e")
+        history_text.tag_configure("label", font=("Arial", 10), foreground="#333")
+        history_text.tag_configure("amount", font=("Arial", 10, "bold"), foreground="#2e7d32")
+        history_text.tag_configure("divider", foreground="#ccc")
 
-    for date, amount, desc, group in rows:
-        history_text.insert(tk.END, f"{date} | ${amount:.2f} | {desc or 'No description'} | Group: {group or 'N/A'}\n")
+    #for date, amount, desc, group in rows:
+        #history_text.insert(tk.END, f"{date} | ${amount:.2f} | {desc or 'No description'} | Group: {group or 'N/A'}\n")
 
     show_frame(history_frame)
 
@@ -464,6 +483,16 @@ def log_activity(msg):
     activity_text.see("end")  
     activity_text.config(state="disabled")
 
+#shwo password
+show_password_var = tk.IntVar()
+def toggle_password_visibility():
+    if show_password_var.get():
+        login_password.config(show="")
+    else:
+        if login_password.get() != "Password":
+            login_password.config(show="*")
+        else:
+            login_password.config(show="")
 
 
 def open_settings():
@@ -500,8 +529,10 @@ def view_group_members():
         return
 
     gid = result[0]
+    show_group_balances(logged_in_email, gid)
 
-    # ✅ Show clean 'who owes whom' instead of summary
+
+    # Show clean 'who owes whom' instead of summary
     cursor.execute("""
         SELECT from_user, to_user, SUM(amount)
         FROM balances
@@ -728,6 +759,24 @@ def show_group_balances(logged_in_email, group_id):
 
     messagebox.showinfo(f"Group '{group_id}' balances", message)
 
+#for clearing history in the history frame
+def clear_history_display():
+    global history_backup
+    history_text.config(state="normal")
+    history_backup = history_text.get("1.0", "end")
+    history_text.delete("1.0", "end")
+    history_text.config(state="disabled")
+    undo_button.pack(anchor="w", padx=10, pady=(5, 0))
+
+def restore_history():
+    global history_backup
+    history_text.config(state="normal")
+    history_text.delete("1.0", "end")
+    history_text.insert("end", history_backup)
+    history_text.config(state="disabled")
+    undo_button.pack_forget()
+
+
 def show_clear_balances(group_id):
     message = ""
 
@@ -825,10 +874,43 @@ def load_notification_setting():
 # === UI Code ===
 
 
+
 # --- History Frame ---
-history_text = tk.Text(history_frame, height=30, width=50)
-history_text.pack(pady=10)
-tk.Button(history_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
+history_frame.pack_propagate(False)
+
+# Top-left Back button
+tk.Button(history_frame, text="⬅ Back to DB", font=("Arial", 10, "bold"),
+          bg="#c8e6c9", command=lambda: show_frame(dashboard_frame)).pack(anchor="nw", padx=10, pady=(10, 5))
+
+# Container for the history display
+history_display_container = tk.Frame(history_frame, bg="#6babc3")
+history_display_container.pack(fill="both", expand=True, padx=10, pady=5)
+
+history_box_wrapper = tk.Frame(history_display_container, bg="#6babc3", bd=2, relief="groove")
+history_box_wrapper.pack(pady=5)
+
+history_text = tk.Text(history_box_wrapper, height=30, width=50, wrap="word",
+bg="white", fg="black", font=("Arial", 10), relief="flat", bd=0)
+history_text.pack()
+
+history_text.bind("<Key>", lambda e: "break")         # Disable typing
+history_text.bind("<Control-v>", lambda e: "break")   # Disable paste
+history_text.bind("<Button-3>", lambda e: "break")    # Disable right-click paste
+
+
+
+# Bottom buttons: Clear and Undo (in horizontal row)
+history_button_row = tk.Frame(history_frame, bg="#6babc3")
+history_button_row.pack(pady=10)
+
+clear_btn = tk.Button(history_button_row, text="🧹 Clear Display", font=("Arial", 10),
+                      bg="#ffe0b2", command=clear_history_display)
+clear_btn.pack(side="left", padx=5)
+
+undo_button = tk.Button(history_button_row, text="↩️ Undo Clear", font=("Arial", 10),
+                        bg="#ffecb3", command=restore_history)
+undo_button.pack(side="left", padx=5)
+undo_button.pack_forget()  # Hidden until Clear is clicked
 
 # --- Login Frame ---
 #tk.Label(login_frame, text="Login", font=("Arial", 20)).pack(pady=10)
@@ -871,12 +953,38 @@ login_email.bind("<FocusOut>", on_focusout_email)
 #login_password = tk.Entry(login_frame, show="*")
 #login_password.pack(pady=5)
 
-# password and placeholder text
+
+
+# Label
 tk.Label(login_box, text="🔑Password", font=("Arial", 14), bg="#fefae0", fg="black", anchor="w").pack(fill="x", pady=(10, 0))
 
-login_password = tk.Entry(login_box, fg='grey', bg="#f5f7f7", insertbackground='white')
+# Frame to hold Entry + Eye icon
+password_container = tk.Frame(login_box, bg="#fefae0")
+password_container.pack(fill="x", pady=5)
+
+# Entry
+login_password = tk.Entry(password_container, fg='grey', bg="#f5f7f7", insertbackground='white', relief="flat")
 login_password.insert(0, "Password")
-login_password.pack(fill="x", pady=5, ipady=5, ipadx=5)
+login_password.pack(side="left", fill="both", expand=True, ipady=5, ipadx=5)
+
+# Eye icon
+show_icon = tk.Label(password_container, text="👁", bg="#f5f7f7", fg="black", cursor="hand2")
+show_icon.pack(side="right", padx=5)
+
+def toggle_password_visibility(event=None):
+    current = login_password.cget("show")
+    if current == "":
+        if login_password.get() != "Password":
+            login_password.config(show="*")
+        show_icon.config(text="👁")
+    else:
+        login_password.config(show="")
+        show_icon.config(text="🙈")
+
+show_icon.bind("<Button-1>", toggle_password_visibility)
+
+
+
 
 def on_entry_click_password(event):
     if login_password.get() == "Password":
@@ -891,10 +999,11 @@ def on_focusout_password(event):
 login_password.bind("<FocusIn>", on_entry_click_password)
 login_password.bind("<FocusOut>", on_focusout_password)
 
+
 remember_checkbox = tk.Checkbutton(login_box, text="📌 Remember Me",font=("Arial", 10), bd=1,highlightthickness=1,highlightbackground="black",selectcolor="white",
 activebackground="#fefae0", indicatoron=True, variable=remember_var, bg="#fefae0", fg="black") 
-#remember_checkbox.pack(pady=(10, 0))
 remember_checkbox.pack(anchor="w", padx=0, pady=(0, 10))
+
 
 #tk.Button(login_box, text="Login", command=login_user).pack(pady=10)
 tk.Button(login_box,text="Login",command=login_user,font=("Arial", 11, "bold"),bg="#2196f3",fg="black",             
@@ -1091,23 +1200,54 @@ custom_split_frame.pack_forget()
 tk.Button(expense_frame, text="Add Expense with Split", command=add_expense).pack(pady=10)
 tk.Button(expense_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
 
-# --- Group Frame ---
-tk.Label(group_frame, text="Create New Group", font=("Arial", 16)).pack(pady=10)
-group_name_entry = tk.Entry(group_frame)
-group_name_entry.pack(pady=5)
-tk.Button(group_frame, text="Add Group", command=add_group).pack(pady=5)
+# --- Group Frame (Stylish Upgrade) ---
+for widget in group_frame.winfo_children():
+    widget.destroy()
+group_frame.configure(bg="#d0f0e0")  # Light, refreshing background
 
-tk.Label(group_frame, text="Your Groups", font=("Arial", 14)).pack(pady=10)
-group_list = tk.Listbox(group_frame, height=8)
-group_list.pack(pady=5, fill="x")
+tk.Label(group_frame, text="👥 Manage Groups", font=("Arial", 18, "bold"),
+         bg="#d0f0e0", fg="#2e7d32").pack(pady=(15, 5))
+tk.Button(group_frame, text="⬅ Back to DB", font=("Arial", 10, "bold"),
+          bg="#c8e6c9", command=lambda: show_frame(dashboard_frame)).pack(anchor="nw", padx=10, pady=(10, 4))
 
-tk.Label(group_frame, text="Add Member Email").pack(pady=5)
-member_email_entry = tk.Entry(group_frame)
-member_email_entry.pack(pady=5)
-tk.Button(group_frame, text="Add Member to Selected Group", command=add_member_to_group).pack(pady=5)
+# ===== Create Group Section =====
+create_group_box = tk.Frame(group_frame, bg="#6babc3", bd=2, relief="ridge", padx=15, pady=15)
+create_group_box.pack(padx=20, pady=10, fill="x")
 
-tk.Button(group_frame, text="View Group Members & Balances", command=view_group_members).pack(pady=10)
-tk.Button(group_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
+
+
+tk.Label(create_group_box, text="➕ Create New Group", font=("Arial", 12, "bold"),
+         bg="white", fg="#004d40").pack(anchor="w")
+group_name_entry = tk.Entry(create_group_box, font=("Arial", 11), bg="#f7f7f7",fg="black", relief="sunken")
+group_name_entry.pack(fill="x", pady=5)
+tk.Button(create_group_box, text="Add Group", bg="#81c784", fg="black",
+          font=("Arial", 10, "bold"), command=add_group).pack(pady=5)
+
+# ===== Your Groups Section =====
+group_list_box = tk.Frame(group_frame, bg="#6babc3", bd=2, relief="ridge", padx=15, pady=15)
+group_list_box.pack(padx=20, pady=10, fill="x")
+
+tk.Label(group_list_box, text="📋 Your Groups", font=("Arial", 12, "bold"),
+         bg="white", fg="#004d40").pack(anchor="w")
+group_list = tk.Listbox(group_list_box, height=8, font=("Arial", 11),
+                        bg="#e8f5e9",fg="black",selectbackground="#a5d6a7", relief="flat")
+group_list.pack(fill="x", pady=5)
+
+# ===== Add Member Section =====
+add_member_box = tk.Frame(group_frame, bg="#6babc3", bd=2, relief="ridge", padx=15, pady=15)
+add_member_box.pack(padx=20, pady=10, fill="x")
+
+tk.Label(add_member_box, text="📧 Add Member Email", font=("Arial", 12),
+         bg="white", fg="#004d40").pack(anchor="w")
+member_email_entry = tk.Entry(add_member_box, font=("Arial", 11), bg="#f7f7f7",fg="red", relief="sunken")
+member_email_entry.pack(fill="x", pady=5)
+tk.Button(add_member_box, text="Add Member to Selected Group", bg="#4db6ac", fg="black",
+          font=("Arial", 10, "bold"), command=add_member_to_group).pack(pady=5)
+
+# ===== Bottom Action Buttons =====
+tk.Button(group_frame, text="📊 View Group Balances", font=("Arial", 11, "bold"),
+          bg="#fff176", fg="black", relief="raised", command=view_group_members).pack(pady=(15, 5))
+
 
 # --- Settings Frame ---
 tk.Label(settings_frame, text="Change Password", font=("Arial", 14)).pack(pady=10)
