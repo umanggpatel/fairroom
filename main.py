@@ -932,7 +932,7 @@ title_label.pack(pady=(0, 10))
 #with email placeholder text
 tk.Label(login_box, text="📧Email", font=("Arial", 14), bg="#fefae0", fg="black", anchor="w").pack(fill="x", pady=(10, 0))
 
-login_email = tk.Entry(login_box, fg='grey', bg="#f5f7f7", insertbackground='white')
+login_email = tk.Entry(login_box, fg='grey', bg="#f5f7f7", insertbackground='black')
 #login_email.insert(0, "youremail@gmail.com")
 login_email.pack(fill="x", pady=5, ipady=5, ipadx=5)
 
@@ -963,7 +963,7 @@ password_container = tk.Frame(login_box, bg="#fefae0")
 password_container.pack(fill="x", pady=5)
 
 # Entry
-login_password = tk.Entry(password_container, fg='grey', bg="#f5f7f7", insertbackground='white', relief="flat")
+login_password = tk.Entry(password_container, fg='grey', bg="#f5f7f7", insertbackground='black', relief="flat")
 login_password.insert(0, "Password")
 login_password.pack(side="left", fill="both", expand=True, ipady=5, ipadx=5)
 
@@ -1032,27 +1032,27 @@ tk.Label(register_box, text="📝 Register", font=("Arial", 20, "bold"), fg="#22
 
 # Input: First Name
 tk.Label(register_box, text="First Name", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
-reg_fname = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_fname = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black",insertbackground="black", relief="sunken")
 reg_fname.pack(fill="x", ipady=4, pady=(0, 10))
 
 # Input: Last Name
 tk.Label(register_box, text="Last Name", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
-reg_lname = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_lname = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black",insertbackground="black", relief="sunken")
 reg_lname.pack(fill="x", ipady=4, pady=(0, 10))
 
 # Input: Email
 tk.Label(register_box, text="📧 Email", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
-reg_email = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_email = tk.Entry(register_box, font=("Arial", 11), bg="#f2f2f2", fg="black",insertbackground="black",relief="sunken")
 reg_email.pack(fill="x", ipady=4, pady=(0, 10))
 
 # Input: Password
 tk.Label(register_box, text="🔒 Password", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
-reg_password = tk.Entry(register_box, show="*", font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_password = tk.Entry(register_box, show="*", font=("Arial", 11), bg="#f2f2f2", fg="black",insertbackground="black", relief="sunken")
 reg_password.pack(fill="x", ipady=4, pady=(0, 10))
 
 # Input: Confirm Password
 tk.Label(register_box, text="🔒 Confirm Password", font=("Arial", 12), bg="white",fg="black", anchor="w").pack(fill="x")
-reg_confirm = tk.Entry(register_box, show="*", font=("Arial", 11), bg="#f2f2f2", fg="black", relief="sunken")
+reg_confirm = tk.Entry(register_box, show="*", font=("Arial", 11), bg="#f2f2f2", fg="black",insertbackground="black", relief="sunken")
 reg_confirm.pack(fill="x", ipady=4, pady=(0, 5))
 
 # Real-time match label
@@ -1256,7 +1256,7 @@ for widget in settings_frame.winfo_children():
 settings_frame.configure(bg="#f5f5f5")
 
 # Split layout: Sidebar (left) and Content Panel (right)
-sidebar = tk.Frame(settings_frame, bg="#263238", width=150)
+sidebar = tk.Frame(settings_frame, bg="#42d2d0", width=150)
 sidebar.pack(side="left", fill="y")
 
 content_panel = tk.Frame(settings_frame, bg="#fefae0")
@@ -1268,12 +1268,15 @@ def switch_content(section):
         widget.destroy()
 
     if section == "password":
-        tk.Label(content_panel, text="🔐 Change Password", font=("Arial", 14, "bold"), bg="#fefae0",fg ="black").pack(pady=10)
-        tk.Label(content_panel, text="Current Password", bg="#fefae0",fg ="black").pack()
-        cp = tk.Entry(content_panel, show="*")
+        tk.Label(content_panel, text="🔐 Change Password", font=("Arial", 14, "bold"),
+                bg="#fefae0", fg="black").pack(pady=10)
+
+        tk.Label(content_panel, text="Current Password", bg="#fefae0", fg="black").pack()
+        cp = tk.Entry(content_panel, show="*", bg="white", fg="black", insertbackground="black")
         cp.pack(pady=5)
-        tk.Label(content_panel, text="New Password", bg="#fefae0", fg ="black").pack()
-        np = tk.Entry(content_panel, show="*")
+
+        tk.Label(content_panel, text="New Password", bg="#fefae0", fg="black").pack()
+        np = tk.Entry(content_panel, show="*", bg="white", fg="black", insertbackground="black")
         np.pack(pady=5)
         def submit_new_password():
             current = hash_password(cp.get())
@@ -1313,7 +1316,7 @@ def switch_content(section):
 
 
 # Sidebar Buttons
-tk.Label(sidebar, text="⚙️ Settings", font=("Arial", 14, "bold"), bg="#54AAB2", fg="black").pack(pady=(20, 10))
+tk.Label(sidebar, text="⚙️ Settings", font=("Arial", 14, "bold"), bg="#42d2d0", fg="black").pack(pady=(20, 10))
 
 buttons = [
     ("🔐 Change Password", "password"),
