@@ -1249,22 +1249,87 @@ tk.Button(group_frame, text="📊 View Group Balances", font=("Arial", 11, "bold
           bg="#fff176", fg="black", relief="raised", command=view_group_members).pack(pady=(15, 5))
 
 
-# --- Settings Frame ---
-tk.Label(settings_frame, text="Change Password", font=("Arial", 14)).pack(pady=10)
-tk.Label(settings_frame, text="Current Password").pack()
-current_password_entry = tk.Entry(settings_frame, show="*")
-current_password_entry.pack(pady=5)
-tk.Label(settings_frame, text="New Password").pack()
-new_password_entry = tk.Entry(settings_frame, show="*")
-new_password_entry.pack(pady=5)
-tk.Button(settings_frame, text="Update Password", command=change_password).pack(pady=10)
+# --- Settings Frame (Modern Style) ---
+for widget in settings_frame.winfo_children():
+    widget.destroy()
 
-tk.Checkbutton(settings_frame, text="Enable Notifications", variable=notif_var, command=toggle_notifications).pack(pady=5)
+settings_frame.configure(bg="#f5f5f5")
 
-tk.Button(settings_frame, text="Logout", command=logout_user).pack(pady=5)
-tk.Button(settings_frame, text="Deactivate Account", command=deactivate_account).pack(pady=5)
-tk.Button(settings_frame, text="Delete Account", command=delete_account).pack(pady=5)
-tk.Button(settings_frame, text="Back to Dashboard", command=lambda: [load_notification_setting(), show_frame(dashboard_frame)]).pack(pady=5)
+# Split layout: Sidebar (left) and Content Panel (right)
+sidebar = tk.Frame(settings_frame, bg="#263238", width=150)
+sidebar.pack(side="left", fill="y")
+
+content_panel = tk.Frame(settings_frame, bg="#fefae0")
+content_panel.pack(side="left", fill="both", expand=True)
+
+# Sidebar Buttons
+def switch_content(section):
+    for widget in content_panel.winfo_children():
+        widget.destroy()
+
+    if section == "password":
+        tk.Label(content_panel, text="🔐 Change Password", font=("Arial", 14, "bold"), bg="#fefae0",fg ="black").pack(pady=10)
+        tk.Label(content_panel, text="Current Password", bg="#fefae0",fg ="black").pack()
+        cp = tk.Entry(content_panel, show="*")
+        cp.pack(pady=5)
+        tk.Label(content_panel, text="New Password", bg="#fefae0", fg ="black").pack()
+        np = tk.Entry(content_panel, show="*")
+        np.pack(pady=5)
+        def submit_new_password():
+            current = hash_password(cp.get())
+            new = hash_password(np.get())
+            cursor.execute("SELECT * FROM users WHERE email=? AND password=?", (logged_in_email, current))
+            if cursor.fetchone():
+                if not np.get():
+                    messagebox.showerror("Error", "New password cannot be empty.")
+                    return
+                cursor.execute("UPDATE users SET password=? WHERE email=?", (new, logged_in_email))
+                conn.commit()
+                messagebox.showinfo("Success", "Password updated.")
+                cp.delete(0, tk.END)
+                np.delete(0, tk.END)
+            else:
+                messagebox.showerror("Error", "Current password is incorrect.")
+        tk.Button(content_panel, text="Update Password", command=submit_new_password, bg="#e6eee6", fg="black").pack(pady=10)
+
+    elif section == "notifications":
+        tk.Label(content_panel, text="🔔 Notification Preferences", font=("Arial", 14, "bold"), bg="white", fg="black").pack(pady=10)
+        notif_check = tk.Checkbutton(content_panel, text="Enable Notifications", variable=notif_var,
+                                     command=toggle_notifications, bg="white", fg="black")
+        notif_check.pack(pady=10)
+
+    elif section == "deactivate":
+        tk.Label(content_panel, text="🚫 Deactivate Account", font=("Arial", 14, "bold"), bg="white",fg="black").pack(pady=10)
+        tk.Label(content_panel, text="You will not be able to log in until reactivated.", bg="white",fg="black").pack()
+        tk.Button(content_panel, text="Deactivate", bg="#ffb74d", command=deactivate_account).pack(pady=10)
+
+    elif section == "delete":
+        tk.Label(content_panel, text="🗑️ Delete Account", font=("Arial", 14, "bold"), bg="white",fg="black").pack(pady=10)
+        tk.Label(content_panel, text="All your data will be permanently deleted.", bg="white",fg="black").pack()
+        tk.Button(content_panel, text="Delete Permanently", bg="white", fg="black", command=delete_account).pack(pady=10)
+
+    elif section == "back":
+        show_frame(dashboard_frame)
+
+
+# Sidebar Buttons
+tk.Label(sidebar, text="⚙️ Settings", font=("Arial", 14, "bold"), bg="#54AAB2", fg="black").pack(pady=(20, 10))
+
+buttons = [
+    ("🔐 Change Password", "password"),
+    ("🔔 Notifications", "notifications"),
+    ("🚫 Deactivate Account", "deactivate"),
+    ("🗑️ Delete Account", "delete"),
+    ("⬅️ Back", "back")
+]
+
+for label, section in buttons:
+    tk.Button(sidebar, text=label, command=lambda sec=section: switch_content(sec),
+              font=("Arial", 10), bg="#37474f", fg="black", relief="flat", anchor="w", padx=10).pack(fill="x", pady=2)
+
+# Load default section
+switch_content("password")
+
 
 
 
