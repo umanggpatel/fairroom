@@ -24,6 +24,20 @@ else:
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
 
+
+cursor.execute("DROP TABLE IF EXISTS balances")
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS balances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_user TEXT NOT NULL,
+        to_user TEXT NOT NULL,
+        amount REAL NOT NULL,
+        group_id INTEGER
+    )
+""")
+conn.commit()
+
+
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
