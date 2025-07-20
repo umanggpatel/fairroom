@@ -24,7 +24,7 @@ def settle_up(group_id, user_email, cursor, conn):
     """, (user_email, group_id))
     conn.commit()
 
-     log activity
+     #log activity
     cursor.execute("""
         INSERT INTO activities (user_email, activity)
         VALUES (?, ?)
