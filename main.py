@@ -532,7 +532,97 @@ def change_password():
     else:
         messagebox.showerror("Error", "Current password is incorrect.")
 
-def view_group_members():
+ #group members view       
+def view_selected_group_members_popup():
+    selection = group_list.curselection()
+    if not selection:
+        messagebox.showerror("Error", "Please select a group.")
+        return
+
+    group_name = group_list.get(selection[0])
+
+    cursor.execute("SELECT id FROM groups WHERE group_name=?", (group_name,))
+    result = cursor.fetchone()
+    if not result:
+        messagebox.showerror("Error", "Group not found.")
+        return
+
+    gid = result[0]
+    cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid,))
+    members = [row[0] for row in cursor.fetchall()]
+
+    # Create popup window
+    popup = tk.Toplevel(root)
+    popup.title(f"{group_name} - Members")
+    popup.geometry("400x400")
+    popup.configure(bg="#eaf6f9")
+    popup.resizable(False, False)
+
+    tk.Label(popup, text=f"Members of '{group_name}'", font=("Arial", 14, "bold"),
+             bg="#eaf6f9", fg="#0d3c61").pack(pady=(15, 5))
+
+    member_list_frame = tk.Frame(popup, bg="#fefae0", bd=2, relief="ridge")
+    member_list_frame.pack(pady=10, padx=20, fill="both", expand=True)
+
+    selected_member = tk.StringVar()
+
+    if members:
+        for email in members:
+            tk.Radiobutton(member_list_frame, text=email, variable=selected_member, value=email,
+                           bg="#fefae0", fg="#333", anchor="w", font=("Arial", 11), highlightthickness=0).pack(
+                fill="x", padx=10, pady=2)
+    else:
+        tk.Label(member_list_frame, text="No members found.", font=("Arial", 11, "italic"),
+                 bg="#fefae0", fg="#777").pack(pady=10)
+
+    # --- Remove Member Button ---
+    def remove_selected_member():
+        email = selected_member.get()
+        if not email:
+            messagebox.showwarning("Select Member", "Please select a member to remove.")
+            return
+        if email == logged_in_email:
+            messagebox.showwarning("Invalid", "You cannot remove yourself from the group.")
+            return
+
+        confirm = messagebox.askyesno("Confirm", f"Remove {email} from {group_name}?")
+        if confirm:
+            cursor.execute("DELETE FROM group_members WHERE group_id=? AND member_email=?", (gid, email))
+            conn.commit()
+            messagebox.showinfo("Removed", f"{email} removed from the group.")
+            popup.destroy()
+            view_selected_group_members_popup()  # Refresh the popup
+
+    # --- Export Members to CSV ---
+    def export_members():
+        if not members:
+            messagebox.showinfo("Export", "No members to export.")
+            return
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv",
+                                                 filetypes=[("CSV files", "*.csv")],
+                                                 title="Save member list as...")
+        if file_path:
+            with open(file_path, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(["Member Email"])
+                for email in members:
+                    writer.writerow([email])
+            messagebox.showinfo("Exported", f"Members exported to:\n{file_path}")
+
+    # --- Button Frame ---
+    action_frame = tk.Frame(popup, bg="#eaf6f9")
+    action_frame.pack(pady=10)
+
+    tk.Button(action_frame, text=" Remove Member", command=remove_selected_member,
+              font=("Arial", 10), bg="#ffcdd2", fg="black").pack(side="left", padx=10)
+
+    tk.Button(action_frame, text="📤 Export to CSV", command=export_members,
+              font=("Arial", 10), bg="#bbdefb", fg="black").pack(side="left", padx=10)
+
+    tk.Button(popup, text="Close", command=popup.destroy,
+              font=("Arial", 10, "bold"), bg="#cfd8dc", fg="black").pack(pady=10)
+
+def view_group_balances():
     selection = group_list.curselection()
     if not selection:
         messagebox.showerror("Error", "Please select a group from the list.")
@@ -571,7 +661,7 @@ def view_group_members():
 
     
 
-# --- Expense Split UI additions ---
+# --- Expense Split UI
 split_type_var = tk.StringVar(value="equal")  # default split type
 
 custom_split_frame = tk.Frame(expense_frame)
@@ -585,13 +675,11 @@ def load_group_members_for_split():
     selected_group = expense_group_combo.get()
     if not selected_group:
         return
-    cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (selected_group, logged_in_email))
-    gid = cursor.fetchone()
+    gid = get_group_id(selected_group)
     if not gid:
         return
-    cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid[0],))
-    members = cursor.fetchall()
-    for (member_email,) in members:
+    members = get_group_members(gid)
+    for member_email in members:
         lbl = tk.Label(custom_split_frame, text=member_email)
         lbl.pack(side="left", padx=5)
         ent = tk.Entry(custom_split_frame, width=8)
@@ -622,130 +710,121 @@ def update_groups_in_expense_combo():
         expense_group_combo.set("")
         toggle_custom_split()
 
-
 expense_category_var = tk.StringVar(value="Select")
+
+def get_group_id(group_name):
+    cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (group_name, logged_in_email))
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+def get_group_members(group_id):
+    cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (group_id,))
+    return [row[0] for row in cursor.fetchall()]
+
+def insert_balance(payer, split_with, group_id, split_amounts):
+    for member in split_with:
+        if member == payer:
+            continue
+        amount = split_amounts[member]
+
+        cursor.execute("""
+            SELECT amount FROM balances
+            WHERE from_user = ? AND to_user = ? AND group_id = ?
+        """, (member, payer, group_id))
+        row = cursor.fetchone()
+
+        if row:
+            new_amount = round(row[0] + amount, 2)
+            cursor.execute("""
+                UPDATE balances SET amount = ?
+                WHERE from_user = ? AND to_user = ? AND group_id = ?
+            """, (new_amount, member, payer, group_id))
+        else:
+            cursor.execute("""
+                INSERT INTO balances (from_user, to_user, amount, group_id)
+                VALUES (?, ?, ?, ?)
+            """, (member, payer, amount, group_id))
+
+    conn.commit()
+
+def log_activity(user, message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO activities (user_email, activity, timestamp)
+        VALUES (?, ?, ?)
+    """, (user, message, timestamp))
+
+def record_split(expense_id, members, split_type, amount):
+    split_amounts = {}
+
+    if split_type == "equal":
+        split_amount = round(amount / len(members), 2)
+        for member in members:
+            if member == logged_in_email:
+                continue
+            cursor.execute("INSERT INTO expense_splits (expense_id, member_email, amount) VALUES (?, ?, ?)",
+                           (expense_id, member, split_amount))
+            split_amounts[member] = split_amount
+
+    elif split_type == "custom":
+        total = 0
+        for member in members:
+            val = float(custom_entries[member].get())
+            total += val
+            cursor.execute("INSERT INTO expense_splits (expense_id, member_email, amount) VALUES (?, ?, ?)",
+                           (expense_id, member, val))
+            split_amounts[member] = val
+        if round(total, 2) != round(amount, 2):
+            raise ValueError("Custom split amounts do not sum to total")
+
+    return split_amounts
+
 def add_expense():
     try:
         amount = float(expense_amount.get())
         desc = expense_desc.get()
-
-
         category = expense_category_var.get()
-
-
-
         group_name = expense_group_combo.get()
+
         if not group_name:
             messagebox.showerror("Error", "Please select a group.")
             return
 
-        cursor.execute("INSERT INTO expenses (user_email, amount, description, category) VALUES (?, ?, ?, ?)",
-        (logged_in_email, amount, desc, category_var.get())
-)
-        
-        
-        expense_id = cursor.lastrowid
-
-        cursor.execute("SELECT id FROM groups WHERE group_name=? AND owner_email=?", (group_name, logged_in_email))
-        gid = cursor.fetchone()
+        gid = get_group_id(group_name)
         if not gid:
-            messagebox.showerror("Error", "Group not found or you are not the owner.")
+            messagebox.showerror("Error", "Group not found.")
             return
-        gid = gid[0]
 
-        cursor.execute("SELECT member_email FROM group_members WHERE group_id=?", (gid,))
-        members = [row[0] for row in cursor.fetchall()]
+        members = get_group_members(gid)
         if not members:
             messagebox.showerror("Error", "No members in selected group.")
             return
 
+        cursor.execute("INSERT INTO expenses (user_email, amount, description, category) VALUES (?, ?, ?, ?)",
+                       (logged_in_email, amount, desc, category))
+        expense_id = cursor.lastrowid
+
         split_type = split_type_var.get()
+        split_amounts = record_split(expense_id, members, split_type, amount)
 
-        if split_type == "equal":
-            split_amount = round(amount / len(members), 2)
-            total_assigned = split_amount * (len(members) - 1)
-            last_amount = round(amount - total_assigned, 2)
-            for i, member in enumerate(members):
-                amt = split_amount if i < len(members) - 1 else last_amount
-                cursor.execute("INSERT INTO expense_splits (expense_id, member_email, amount) VALUES (?, ?, ?)",
-                               (expense_id, member, amt))
+        insert_balance(logged_in_email, members, gid, split_amounts)
 
-        elif split_type == "custom":
-            total_entered = 0
-            for member in members:
-                ent = custom_entries.get(member)
-                if not ent:
-                    messagebox.showerror("Error", "Missing custom amounts.")
-                    return
-                try:
-                    val = float(ent.get())
-                except:
-                    messagebox.showerror("Error", f"Invalid amount for {member}")
-                    return
-                total_entered += val
+        log_activity(logged_in_email, f"Added expense: ${amount:.2f} - {desc} in group '{group_name}' split {split_type}")
 
-            if round(total_entered, 2) != round(amount, 2):
-                messagebox.showerror("Error", f"Custom split amounts (${total_entered:.2f}) do not sum to total amount (${amount:.2f})")
-                return
-
-            for member in members:
-                val = float(custom_entries[member].get())
-                cursor.execute("INSERT INTO expense_splits (expense_id, member_email, amount) VALUES (?, ?, ?)",
-                               (expense_id, member, val))
-        else:
-            messagebox.showerror("Error", "Invalid split type selected.")
-            return
-
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute("""INSERT INTO activities (user_email, activity, timestamp) VALUES (?, ?, ?)""",(logged_in_email, f"Added expense: ${amount:.2f} - {desc} in group '{group_name}' split {split_type}", timestamp))
-        insert_balance(
-    payer=logged_in_email,
-    split_with=members,
-    amount=amount,
-    group_id=gid
-)
-        # Update balances   
         conn.commit()
+        messagebox.showinfo("Success", "Expense recorded successfully.")
 
-   
-
-        
-        messagebox.showinfo("Success", "Expense recorded with split.")
         expense_amount.delete(0, tk.END)
         expense_desc.delete(0, tk.END)
         toggle_custom_split()
         update_activity_feed()
 
-
-        
-
-    except ValueError:
-        messagebox.showerror("Error", "Invalid amount")
-
-def show_frame(frame):
-    frame.tkraise()
-
-
-def clear_frame(frame):
-    for widget in frame.winfo_children():
-        widget.destroy()
-def insert_balance(payer, split_with, amount, group_id):
-    total_people = len(split_with) + 1
-    split_amount = amount / total_people
-
-    for person in split_with:
-        if person != payer:
-            cursor.execute("""
-                INSERT INTO balances (from_user, to_user, amount, group_id)
-                VALUES (?, ?, ?, ?)
-            """, (person, payer, split_amount, group_id))
-
-    conn.commit()
+    except ValueError as ve:
+        messagebox.showerror("Error", str(ve))
 
 def show_group_balances(logged_in_email, group_id):
     message = ""
 
-    # Get who you owe
     cursor.execute("""
         SELECT to_user, SUM(amount) FROM balances
         WHERE from_user = ? AND group_id = ?
@@ -753,7 +832,6 @@ def show_group_balances(logged_in_email, group_id):
     """, (logged_in_email, group_id))
     owes_list = cursor.fetchall()
 
-    # Get who owes you
     cursor.execute("""
         SELECT from_user, SUM(amount) FROM balances
         WHERE to_user = ? AND group_id = ?
@@ -765,16 +843,24 @@ def show_group_balances(logged_in_email, group_id):
         message = "You have no balances in this group."
     else:
         if owes_list:
-            message += "🔻 You Owe:\n"
+            message += "You owe:\n"
             for to_user, amt in owes_list:
-                message += f"→ {to_user}: ${amt:.2f}\n"
+                message += f"  {to_user}: ${amt:.2f}\n"
 
         if owed_list:
-            message += "\n🟢 Owes You:\n"
+            message += "\nPeople who owe you:\n"
             for from_user, amt in owed_list:
-                message += f"← {from_user}: ${amt:.2f}\n"
+                message += f"  {from_user}: ${amt:.2f}\n"
 
-    messagebox.showinfo(f"Group '{group_id}' balances", message)
+    messagebox.showinfo("Group Balances", message)
+
+def show_frame(frame):
+    frame.tkraise()
+
+def clear_frame(frame):
+    for widget in frame.winfo_children():
+        widget.destroy()
+
 
 #for clearing history in the history frame
 def clear_history_display():
@@ -939,7 +1025,7 @@ login_box.pack(pady=40)
 emoji_label = tk.Label(login_box, text="👤", font=("Arial", 28), fg="#4caf50", bg="white")
 emoji_label.pack(pady=(25, 0))
 
-title_label = tk.Label(login_box, text="Login", font=("Arial", 28, "bold"), fg="#040303", bg="white")
+title_label = tk.Label(login_box, text=" Fairroom Login", font=("Arial", 28, "bold"), fg="#040303", bg="white")
 title_label.pack(pady=(0, 10))
 
 #tk.Label(login_frame, text="Email").pack(pady=5)
@@ -1123,8 +1209,7 @@ tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11),
                            show_frame(monthly_summary_frame),
                            show_monthly_summary(monthly_summary_frame, cursor, logged_in_email, lambda: show_frame(dashboard_frame))]).pack(fill="x", pady=2)
 
-tk.Button(dashboard_frame, text="Settle Up Balances", bg="#ffcccc",
-          command=lambda: settle_up(current_group_id, logged_in_email, cursor, conn)).pack(pady=5)
+
 
 #tk.Button(action_section, text="📊 Monthly Summary", font=("Arial", 11), command=view_monthly_summary).pack(fill="x", pady=2)
 tk.Button(action_section, text="💾 Export Expenses (CSV)", font=("Arial", 11), command=export_expenses).pack(fill="x", pady=2)
@@ -1135,7 +1220,7 @@ tk.Button(action_section, text="\u21AA Logout", command=logout_user).pack(side="
 
 
 # Right side container: for activity 
-right_content = tk.Frame(main_body, bg="#f7f7f7")
+right_content = tk.Frame(main_body, bg="#fefae0")
 right_content.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
 # : Recent Activity Feed -----------
@@ -1175,7 +1260,7 @@ activity_text.insert("end", "No recent activity yet...")
 activity_text.config(state="disabled")
 
 # ----------- BOTTOM: Placeholder for future graphs/visuals -----------
-dashboard_widgets_frame = tk.Frame(right_content, bg="#f7f7f7")
+dashboard_widgets_frame = tk.Frame(right_content, bg="#fefae0")
 dashboard_widgets_frame.pack(fill="both", expand=True)
 
 placeholder = tk.Label(dashboard_widgets_frame, text="📊 Graphs & Summaries Coming Soon!", 
@@ -1187,37 +1272,44 @@ placeholder.pack(pady=20)
 
 
 
-# --- Expense Frame ---
-tk.Label(expense_frame, text="Add Expense", font=("Arial", 16)).pack(pady=10)
-tk.Label(expense_frame, text="Amount").pack()
-expense_amount = tk.Entry(expense_frame)
-expense_amount.pack(pady=5)
+# --- Expense Frame UI Setup ---
+for widget in expense_frame.winfo_children():
+    widget.destroy()
 
-tk.Label(expense_frame, text="Description").pack()
-expense_desc = tk.Entry(expense_frame)
-expense_desc.pack(pady=5)
+expense_frame.configure(bg="#fefae0")  # soft background
 
-tk.Label(expense_frame, text="Category:").pack()
+tk.Label(expense_frame, text="Add Expense", font=("Arial", 16, "bold"), fg="#333", bg="#fefae0").grid(row=0, column=0, columnspan=2, pady=(10, 10))
+
+tk.Label(expense_frame, text="Amount:", fg="#000", bg="#fefae0").grid(row=1, column=0, sticky="e", padx=10, pady=5)
+expense_amount = tk.Entry(expense_frame, bg="white", fg="black",insertbackground="black")
+expense_amount.grid(row=1, column=1, padx=10, pady=5)
+
+tk.Label(expense_frame, text="Description:", fg="#000", bg="#fefae0").grid(row=2, column=0, sticky="e", padx=10, pady=5)
+expense_desc = tk.Entry(expense_frame, bg="white", fg="black",insertbackground="black")
+expense_desc.grid(row=2, column=1, padx=10, pady=5)
+
+tk.Label(expense_frame, text="Category:", fg="#000", bg="#fefae0").grid(row=3, column=0, sticky="e", padx=10, pady=5)
 category_var = tk.StringVar()
-category_combo = ttk.Combobox(expense_frame, textvariable=category_var)
-category_combo['values'] = ("Groceries", "Utilities", "Travel", "Rent", "Dining Out","Medical","Entertainment" , "Other")
-category_combo.pack()
+category_combo = ttk.Combobox(expense_frame, textvariable=category_var, state="readonly")
+category_combo['values'] = ("Groceries", "Utilities", "Travel", "Rent", "Dining Out", "Medical", "Entertainment", "Other")
+category_combo.grid(row=3, column=1, padx=10, pady=5)
 
-
-tk.Label(expense_frame, text="Select Group").pack(pady=5)
+tk.Label(expense_frame, text="Select Group:", fg="#000", bg="#fefae0").grid(row=4, column=0, sticky="e", padx=10, pady=5)
 expense_group_combo = ttk.Combobox(expense_frame, state="readonly")
-expense_group_combo.pack(pady=5)
+expense_group_combo.grid(row=4, column=1, padx=10, pady=5)
 
-tk.Label(expense_frame, text="Split Type").pack(pady=5)
-split_equal_rb = tk.Radiobutton(expense_frame, text="Equal Split", variable=split_type_var, value="equal", command=toggle_custom_split)
-split_equal_rb.pack()
-split_custom_rb = tk.Radiobutton(expense_frame, text="Customize Split", variable=split_type_var, value="custom", command=toggle_custom_split)
-split_custom_rb.pack()
+tk.Label(expense_frame, text="Split Type:", fg="#000", bg="#fefae0").grid(row=5, column=0, sticky="ne", padx=10, pady=5)
+split_equal_rb = tk.Radiobutton(expense_frame, text="Equal Split", variable=split_type_var, value="equal", bg="#fefae0",fg="black", command=toggle_custom_split)
+split_equal_rb.grid(row=5, column=1, sticky="w", padx=10)
+split_custom_rb = tk.Radiobutton(expense_frame, text="Customize Split", variable=split_type_var, value="custom", bg="#fefae0",fg="black", command=toggle_custom_split)
+split_custom_rb.grid(row=6, column=1, sticky="w", padx=10)
 
-custom_split_frame.pack_forget()
+# Recreate and show custom_split_frame properly
+custom_split_frame = tk.Frame(expense_frame, bg="#fefae0")
+custom_split_frame.grid(row=7, column=0, columnspan=2, pady=5, sticky="w")
 
-tk.Button(expense_frame, text="Add Expense with Split", command=add_expense).pack(pady=10)
-tk.Button(expense_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).pack(pady=5)
+tk.Button(expense_frame, text="Add Expense with Split", command=add_expense).grid(row=8, column=0, columnspan=2, pady=10)
+tk.Button(expense_frame, text="Back to Dashboard", command=lambda: show_frame(dashboard_frame)).grid(row=9, column=0, columnspan=2, pady=5)
 
 # --- Group Frame (Stylish Upgrade) ---
 for widget in group_frame.winfo_children():
@@ -1262,11 +1354,15 @@ member_email_entry = tk.Entry(add_member_box, font=("Arial", 11), bg="#f7f7f7",f
 member_email_entry.pack(fill="x", pady=5)
 tk.Button(add_member_box, text="Add Member to Selected Group", bg="#4db6ac", fg="black",
           font=("Arial", 10, "bold"), command=add_member_to_group).pack(pady=5)
+tk.Button(group_frame, text="👥 View Group Members", font=("Arial", 10, "bold"),
+          bg="#c5cae9", fg="black", command=view_selected_group_members_popup).pack(pady=5)
+tk.Button(group_frame, text="Settle Up Balances", bg="#ffcccc",
+          command=lambda: settle_up(current_group_id, logged_in_email, cursor, conn)).pack(pady=5)
+
 
 # ===== Bottom Action Buttons =====
 tk.Button(group_frame, text="📊 View Group Balances", font=("Arial", 11, "bold"),
-          bg="#fff176", fg="black", relief="raised", command=view_group_members).pack(pady=(15, 5))
-
+          bg="#fff176", fg="black", relief="raised", command=view_group_balances).pack(pady=(15, 5))
 
 # --- Settings Frame (Modern Style) ---
 for widget in settings_frame.winfo_children():
