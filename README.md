@@ -11,6 +11,7 @@ A simple desktop application built with Python and Tkinter to help roommates reg
 - Tkinter GUI interface
 
  Navigate into the project directory:
+ 
 
 #Requirements: 
   Python 3.x
