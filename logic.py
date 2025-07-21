@@ -81,3 +81,4 @@ class ExpenseManager:
         self.c.execute("SELECT SUM(amount) FROM expenses WHERE group_id=?", (group_id,))
         total = self.c.fetchone()[0]
         return total if total else 0
+
