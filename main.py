@@ -1263,10 +1263,6 @@ activity_text.config(state="disabled")
 dashboard_widgets_frame = tk.Frame(right_content, bg="#fefae0")
 dashboard_widgets_frame.pack(fill="both", expand=True)
 
-placeholder = tk.Label(dashboard_widgets_frame, text="📊 Graphs & Summaries Coming Soon!", 
-                       font=("Arial", 12, "italic"), bg="#f7f7f7", fg="#888")
-placeholder.pack(pady=20)
-
 
 
 
