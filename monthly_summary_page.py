@@ -69,25 +69,6 @@ def show_monthly_summary(frame, cursor, logged_in_email, show_dashboard_callback
     dual_frame = tk.Frame(scrollable_frame, bg="white")
     dual_frame.pack(fill="x", padx=20)
 
-    # ========== Pie Chart (Left) ==========
-    cursor.execute("""
-        SELECT category, SUM(amount)
-        FROM expenses
-        WHERE user_email=?
-        GROUP BY category
-    """, (logged_in_email,))
-    cat_data = cursor.fetchall()
-
-    categories = [row[0] for row in cat_data]
-    cat_totals = [row[1] for row in cat_data]
-
-    fig2, ax2 = plt.subplots(figsize=(4.5, 4), dpi=100)
-    ax2.pie(cat_totals, labels=categories, autopct='%1.1f%%', startangle=140)
-    ax2.set_title("Category-wise Expense Distribution")
-
-    canvas2 = FigureCanvasTkAgg(fig2, master=dual_frame)
-    canvas2.draw()
-    canvas2.get_tk_widget().pack(side="left", padx=10)
 
 # Get all users who owe the logged-in user money (i.e., to_user = you)
     cursor.execute("""
